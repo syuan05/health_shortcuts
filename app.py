@@ -33,18 +33,32 @@ def test_db():
 @app.route('/get_record', methods=['GET'])
 def get_record():
     date = request.args.get('date')
+    if not date:
+        return jsonify({"status": "error", "message": "Missing date"}), 400
+    
+    conn = None
     try:
         conn = pymysql.connect(**db_config)
         with conn.cursor() as cursor:
             sql = "SELECT raw_json FROM daily_records WHERE record_date = %s"
             cursor.execute(sql, (date,))
             result = cursor.fetchone()
-        conn.close()
-        if result:
-            return jsonify({"status": "success", "data": json.loads(result['raw_json'])})
-        return jsonify({"status": "empty"})
+        
+        if result and result.get('raw_json'):
+            # 直接解析 JSON 字串並回傳
+            return jsonify({
+                "status": "success", 
+                "data": json.loads(result['raw_json'])
+            })
+        else:
+            return jsonify({"status": "empty", "message": "No record found"})
+            
     except Exception as e:
+        print(f"Database error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 @app.route('/save', methods=['POST'])
 def save_data():
     data = request.json
