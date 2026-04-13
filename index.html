@@ -225,16 +225,57 @@ function updateBar(k,c,g){
     if(c >= g && valEl) valEl.classList.add('status-done'); else if(valEl) valEl.classList.remove('status-done');
 }
 
-function onDateChange(){
-    const date=document.getElementById('r-date').value; const r=records.find(x=>x.date===date);
-    document.getElementById('meals-wrap').innerHTML=''; document.getElementById('exer-wrap').innerHTML=''; meals=[]; exers=[];
-    if(r){
-        if(r.meals) r.meals.forEach(m=>addMeal(m)); if(r.exerList) r.exerList.forEach(e=>addExer(e));
-        document.getElementById('is-exercise').value=r.isExercise||'否'; toggleExercise();
-        document.getElementById('r-water').value=r.water || ""; document.getElementById('r-steps').value=r.steps || "";
-        ['stress','fatigue','poop','edema','fullness'].forEach(f=>document.getElementById('r-'+f).value=r[f] || "");
-        document.getElementById('r-evil').value=r.evil||'否';
-    }else{ addMeal(); document.getElementById('is-exercise').value='否'; toggleExercise(); document.getElementById('r-water').value=""; document.getElementById('r-steps').value=""; ['stress','fatigue','poop','edema','fullness'].forEach(f=>document.getElementById('r-'+f).value=""); }
+async function onDateChange() {
+    const date = document.getElementById('r-date').value;
+    if (!date) return;
+
+    // 清空目前畫面
+    document.getElementById('meals-wrap').innerHTML = '';
+    document.getElementById('exer-wrap').innerHTML = '';
+    meals = []; exers = [];
+
+    showToast('讀取中...');
+
+    try {
+        // 1. 優先嘗試從雲端抓取 (Render)
+        const response = await fetch(`https://health-shortcuts.onrender.com/get_record?date=${date}`);
+        const cloudData = await response.json();
+
+        let r = null;
+        if (cloudData.status === 'success') {
+            r = cloudData.data;
+            showToast('已載入雲端紀錄');
+        } else {
+            // 2. 雲端沒資料，才找本地 localStorage
+            r = records.find(x => x.date === date);
+            if(r) showToast('載入本地快取');
+        }
+
+        // 3. 填入數據到畫面上
+        if (r) {
+            if (r.meals) r.meals.forEach(m => addMeal(m));
+            if (r.exerList) r.exerList.forEach(e => addExer(e));
+            document.getElementById('is-exercise').value = r.isExercise || '否';
+            toggleExercise();
+            document.getElementById('r-water').value = r.water || "";
+            document.getElementById('r-steps').value = r.steps || "";
+            document.getElementById('r-evil').value = r.evil || '否';
+            ['stress', 'fatigue', 'poop', 'edema', 'fullness'].forEach(f => {
+                const el = document.getElementById('r-' + f);
+                if (el) el.value = r[f] || "";
+            });
+        } else {
+            // 完全沒資料就開新的一餐
+            addMeal();
+            document.getElementById('is-exercise').value = '否';
+            toggleExercise();
+        }
+    } catch (err) {
+        console.error('連線失敗:', err);
+        showToast('連線失敗，僅載入本地資料');
+        const r = records.find(x => x.date === date);
+        if (r && r.meals) r.meals.forEach(m => addMeal(m));
+    }
     calcAll();
 }
 
@@ -413,7 +454,14 @@ function clearAllData(){ if(confirm('⚠️ 確定要清空所有歷史紀錄嗎
 
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast show'; setTimeout(()=>t.className='toast',2000); }
 
-window.onload=()=>{ document.getElementById('r-date').value=new Date().toISOString().split('T')[0]; onDateChange(); };
+window.onload = () => {
+    // 設定今日日期
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('r-date').value = today;
+    
+    // 主動執行讀取
+    onDateChange(); 
+};
 </script>
 </body>
 </html>
