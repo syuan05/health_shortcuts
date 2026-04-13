@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>《自檢表》數位管理工具</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg: #f7f5f2; --surface: #ffffff; --surface2: #f0ede8; --border: #e2ddd6; --text: #1a1714; --text2: #6b6560; --accent: #c4773a; --radius: 14px; --red: #c44040; --green: #3a7c5e; --water: #4a90e2; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 120px; }
+.app { max-width: 480px; margin: 0 auto; position: relative; }
+
+/* 核心修復：確保卡片不會互相覆蓋 */
+.card { 
+    background: var(--surface); 
+    border-radius: var(--radius); 
+    border: 1px solid var(--border); 
+    padding: 16px; 
+    margin: 12px; 
+    position: relative; 
+    z-index: 1; 
+}
+.card-title { font-size: 14px; font-weight: 700; border-left: 4px solid var(--accent); padding-left: 10px; margin-bottom: 15px; }
+
+/* 日期欄位修正：防止高度撐開擋住下方 */
+#r-date { 
+    width: 100%; 
+    height: 42px;
+    display: block; 
+    -webkit-appearance: none; 
+    background: #fff;
+    font-family: inherit;
+    font-size: 16px; /* 防止 iOS 自動放大 */
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+/* 儀表板 */
+.total-box { background: #fffcf5; border: 1px solid #f0e6d2; padding: 15px 10px; border-radius: 12px; margin-bottom: 15px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; }
+.total-item { display: flex; flex-direction: column; align-items: center; }
+.total-val { font-size: 18px; font-weight: 800; margin-bottom: 5px; }
+.progress-bg { background: #e2ddd6; height: 6px; border-radius: 3px; width: 100%; margin: 0 auto; overflow: hidden; }
+.progress-bar { height: 100%; width: 0%; transition: 0.3s; }
+
+/* 水量進度 */
+.water-progress-wrap { margin-top: 10px; background: #f0f7ff; padding: 12px; border-radius: 8px; border: 1px solid #d0e3f7; }
+.water-info { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: var(--water); font-weight: bold; }
+
+.item-block { background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); padding: 14px; margin-bottom: 15px; position: relative; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.lbl { font-size: 11px; font-weight: 500; color: var(--text2); margin-bottom: 6px; display: block; }
+
+/* 輸入框優化 */
+input, select { 
+    width: 100%; 
+    height: 42px; 
+    padding: 8px; 
+    border: 1px solid var(--border); 
+    border-radius: 6px; 
+    font-size: 14px; 
+    background: #fff;
+    position: relative;
+    z-index: 2; /* 提高輸入框層級 */
+}
+::placeholder { color: #ccc; opacity: 1; }
+
+.btn-add { width: 100%; padding: 12px; background: #fff; border: 1px dashed var(--accent); color: var(--accent); border-radius: 8px; cursor: pointer; margin-top: 5px; font-weight: 500; position: relative; z-index: 5; }
+.btn-save { width: calc(100% - 24px); margin: 20px 12px; padding: 16px; background: var(--accent); color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; position: relative; z-index: 5; }
+
+.img-preview { width: 100%; margin-top: 10px; border-radius: 8px; display: none; overflow: hidden; border: 1px solid #ddd; }
+.img-preview img { width: 100%; display: block; }
+.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; opacity: 0; z-index: 9999; pointer-events: none; transition: 0.3s; }
+.toast.show { opacity: 1; }
+.admin-btns { display: flex; gap: 8px; padding: 0 12px; margin-bottom: 40px; position: relative; z-index: 5; }
+.btn-sec { flex: 1; padding: 10px; font-size: 11px; background: #eee; border: 1px solid #ddd; border-radius: 8px; color: #666; cursor: pointer; }
+.combo-wrap { position: relative; width: 100%; }
+.combo-select { position: absolute; top: 0; right: 0; width: 40px; height: 100%; border: none; background: transparent; color: transparent; cursor: pointer; opacity: 0.1; z-index: 3; }
+.status-done { color: var(--green) !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="card"><label class="lbl">日期</label><input type="date" id="r-date" onchange="onDateChange()"></div>
+  
+  <div class="card">
+    <div class="card-title">飲食進度</div>
+    <div class="total-box">
+      <div class="total-item"><div class="lbl">主食(3)</div><div id="val-carb" class="total-val">0</div><div class="progress-bg"><div id="bar-carb" class="progress-bar" style="background:var(--accent)"></div></div></div>
+      <div class="total-item"><div class="lbl">蛋白(3)</div><div id="val-prot" class="total-val">0</div><div class="progress-bg"><div id="bar-prot" class="progress-bar" style="background:var(--green)"></div></div></div>
+      <div class="total-item"><div class="lbl">蔬菜(4)</div><div id="val-veg" class="total-val">0</div><div class="progress-bg"><div id="bar-veg" class="progress-bar" style="background:var(--accent)"></div></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">飲食紀錄</div>
+    <div id="meals-wrap"></div><button class="btn-add" onclick="addMeal()">＋ 新增一餐</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">生活紀錄</div>
+    <label class="lbl">每日步數 (目標 6000)</label>
+    <input type="number" id="r-steps" placeholder="0" style="margin-bottom:8px" oninput="calcAll()" onchange="calcAll()" onkeyup="calcAll()">
+    <div class="water-progress-wrap" style="background: #fff9f0; border-color: #f7e9d7; margin-bottom:15px">
+        <div class="water-info" style="color: var(--accent)">
+            <span>步數進度</span>
+            <span id="steps-status-txt">還差 6000 步</span>
+        </div>
+        <div class="progress-bg">
+            <div id="bar-steps" class="progress-bar" style="background:var(--accent)"></div>
+        </div>
+    </div>
+    <label class="lbl">喝水量 (ml)</label>
+    <input type="number" id="r-water" placeholder="0" oninput="calcAll()" onchange="calcAll()" onkeyup="calcAll()">
+    <div class="water-progress-wrap">
+        <div class="water-info"><span>進度</span><span id="water-status-txt">還差 2415 ml</span></div>
+        <div class="progress-bg"><div id="bar-water" class="progress-bar" style="background:var(--water)"></div></div>
+    </div>
+    <div style="margin-top:15px"><label class="lbl">今日有運動？</label><select id="is-exercise" onchange="toggleExercise()"><option value="否">否</option><option value="是">是</option></select></div>
+    <div id="exercise-content" style="display:none;margin-top:10px"><div id="exer-wrap"></div><button class="btn-add" onclick="addExer()">＋ 項目</button></div>
+    <div style="margin-top:15px"><label class="lbl">吃了邪惡食物？</label><select id="r-evil"><option>否</option><option>是</option></select></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">身體狀況</div>
+    <div class="row3">
+        <div><label class="lbl">壓力</label><div class="combo-wrap"><input type="number" id="r-stress" placeholder="0"><select class="combo-select" onchange="this.previousElementSibling.value=this.value"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div></div>
+        <div><label class="lbl">疲勞</label><div class="combo-wrap"><input type="number" id="r-fatigue" placeholder="0"><select class="combo-select" onchange="this.previousElementSibling.value=this.value"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div></div>
+        <div><label class="lbl">便便</label><div class="combo-wrap"><input type="number" id="r-poop" placeholder="0"><select class="combo-select" onchange="this.previousElementSibling.value=this.value"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div></div>
+        <div><label class="lbl">水腫</label><div class="combo-wrap"><input type="number" id="r-edema" placeholder="0"><select class="combo-select" onchange="this.previousElementSibling.value=this.value"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div></div>
+        <div><label class="lbl">飽足</label><div class="combo-wrap"><input type="number" id="r-fullness" placeholder="0"><select class="combo-select" onchange="this.previousElementSibling.value=this.value"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div></div>
+    </div>
+  </div>
+
+  <button class="btn-save" onclick="saveRecord()">儲存今日數據</button>
+
+  <div class="admin-btns">
+    <button class="btn-sec" onclick="exportData()">📤 匯出</button>
+    <button class="btn-sec" onclick="importData()">📥 匯入</button>
+    <button class="btn-sec" style="color:red" onclick="clearAllData()">🗑️ 清空</button>
+  </div>
+</div>
+<div class="toast" id="toast">儲存成功！</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+const mealTypes=['早餐','午餐','晚餐','點心','宵夜']; 
+const goals={carb:3, prot:3, veg:4, water:2415};
+let records=JSON.parse(localStorage.getItem('hj_records')||'[]'); 
+let meals=[], mealIdCtr=0, exers=[], exerIdCtr=0;
+
+function handleImage(id, file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 400;
+            const scale = MAX_WIDTH / img.width;
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            document.getElementById(`img-${id}`).src = canvas.toDataURL('image/jpeg', 0.6);
+            document.getElementById(`preview-${id}`).style.display = 'block';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function toggleExercise(){ document.getElementById('exercise-content').style.display=(document.getElementById('is-exercise').value==='是'?'block':'none'); if(exers.length===0 && document.getElementById('is-exercise').value==='是')addExer(); }
+
+function calcAll(){
+    // 1. 飲食計算
+    let tc=0,tp=0,tv=0; 
+    meals.forEach(id=>{
+        tc+=parseFloat(document.getElementById('mcarb-'+id).value)||0;
+        tp+=parseFloat(document.getElementById('mprot-'+id).value)||0;
+        tv+=parseFloat(document.getElementById('mveg-'+id).value)||0;
+    });
+    updateBar('carb',tc,goals.carb); 
+    updateBar('prot',tp,goals.prot); 
+    updateBar('veg',tv,goals.veg);
+
+    // 2. 喝水量計算
+    const wVal = parseFloat(document.getElementById('r-water').value)||0;
+    const wBar = document.getElementById('bar-water');
+    const wStatus = document.getElementById('water-status-txt');
+    wBar.style.width = Math.min((wVal/goals.water)*100, 100) + '%';
+    if(wVal >= goals.water) { 
+        wBar.style.background = 'var(--green)'; 
+        wStatus.textContent = '已達標！✨'; 
+        wStatus.style.color = 'var(--green)'; 
+    } else { 
+        wBar.style.background = 'var(--water)'; 
+        wStatus.textContent = `還差 ${goals.water - wVal} ml`; 
+        wStatus.style.color = 'var(--water)'; 
+    }
+
+    // 3. 步數計算 (新增)
+    const stepGoal = 6000;
+    const sVal = parseFloat(document.getElementById('r-steps').value)||0;
+    const sBar = document.getElementById('bar-steps');
+    const sStatus = document.getElementById('steps-status-txt');
+    sBar.style.width = Math.min((sVal/stepGoal)*100, 100) + '%';
+    if(sVal >= stepGoal) {
+        sBar.style.background = 'var(--green)';
+        sStatus.textContent = '步數已達標！🔥';
+        sStatus.style.color = 'var(--green)';
+    } else {
+        sBar.style.background = 'var(--accent)';
+        sStatus.textContent = `還差 ${stepGoal - sVal} 步`;
+        sStatus.style.color = 'var(--accent)';
+    }
+}
+
+function updateBar(k,c,g){ 
+    const valEl = document.getElementById('val-'+k);
+    if(valEl) valEl.textContent=c.toFixed(1); 
+    const bar = document.getElementById('bar-'+k);
+    if(bar) bar.style.width=Math.min((c/g)*100,100)+'%';
+    if(c >= g && valEl) valEl.classList.add('status-done'); else if(valEl) valEl.classList.remove('status-done');
+}
+
+function onDateChange(){
+    const date=document.getElementById('r-date').value; const r=records.find(x=>x.date===date);
+    document.getElementById('meals-wrap').innerHTML=''; document.getElementById('exer-wrap').innerHTML=''; meals=[]; exers=[];
+    if(r){
+        if(r.meals) r.meals.forEach(m=>addMeal(m)); if(r.exerList) r.exerList.forEach(e=>addExer(e));
+        document.getElementById('is-exercise').value=r.isExercise||'否'; toggleExercise();
+        document.getElementById('r-water').value=r.water || ""; document.getElementById('r-steps').value=r.steps || "";
+        ['stress','fatigue','poop','edema','fullness'].forEach(f=>document.getElementById('r-'+f).value=r[f] || "");
+        document.getElementById('r-evil').value=r.evil||'否';
+    }else{ addMeal(); document.getElementById('is-exercise').value='否'; toggleExercise(); document.getElementById('r-water').value=""; document.getElementById('r-steps').value=""; ['stress','fatigue','poop','edema','fullness'].forEach(f=>document.getElementById('r-'+f).value=""); }
+    calcAll();
+}
+
+function addMeal(d=null){
+    const id=++mealIdCtr; meals.push(id); const div=document.createElement('div'); div.className='item-block';
+    div.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:10px"><select id="mtype-${id}" style="width:auto;border:none;background:none;font-weight:bold">${mealTypes.map(t=>`<option ${d?.type===t?'selected':''}>${t}</option>`).join('')}</select><button onclick="this.parentElement.parentElement.remove();meals=meals.filter(x=>x!==${id});calcAll()" style="color:red;border:none;background:none;font-size:12px;cursor:pointer">移除</button></div>
+    <div class="row3"><div><label class="lbl">主食</label><input type="number" id="mcarb-${id}" value="${d?d.carb:''}" placeholder="0" oninput="calcAll()"></div><div><label class="lbl">蛋白</label><input type="number" id="mprot-${id}" value="${d?d.prot:''}" placeholder="0" oninput="calcAll()"></div><div><label class="lbl">蔬菜</label><input type="number" id="mveg-${id}" value="${d?d.veg:''}" placeholder="0" oninput="calcAll()"></div></div>
+    <input type="text" id="mnote-${id}" value="${d?.note||''}" placeholder="備註..." style="height:36px;margin-bottom:8px">
+    <button onclick="document.getElementById('file-${id}').click()" style="width:100%;padding:8px;font-size:12px;border:1px solid #ddd;background:#fff;border-radius:6px;cursor:pointer">📷 上傳照片</button>
+    <input type="file" id="file-${id}" accept="image/*" style="display:none" onchange="handleImage(${id}, this.files[0])">
+    <div class="img-preview" id="preview-${id}" style="${d?.img?'display:block':''}"><img src="${d?.img||''}" id="img-${id}"></div>`;
+    document.getElementById('meals-wrap').appendChild(div); calcAll();
+}
+
+function addExer(d=null){
+    const id=++exerIdCtr; exers.push(id); const div=document.createElement('div'); div.className='item-block';
+    div.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:5px"><label class="lbl">項目</label><button onclick="this.parentElement.parentElement.remove();exers=exers.filter(x=>x!==${id})" style="color:red;border:none;background:none;font-size:12px;cursor:pointer">移除</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><input type="text" id="ename-${id}" value="${d?.name||''}" placeholder="名稱"><input type="text" id="estr-${id}" value="${d?.str||''}" placeholder="內容"></div>`;
+    document.getElementById('exer-wrap').appendChild(div);
+}
+
+function saveRecord() {
+    const date = document.getElementById('r-date').value;
+    if (!date) { alert("請選擇日期"); return; }
+
+    const rec = {
+        date: date,
+        meals: meals.map(id => ({
+            type: document.getElementById('mtype-' + id).value,
+            carb: document.getElementById('mcarb-' + id).value,
+            prot: document.getElementById('mprot-' + id).value,
+            veg: document.getElementById('mveg-' + id).value,
+            note: document.getElementById('mnote-' + id).value,
+            img: document.getElementById('img-' + id).src.startsWith('data:') ? document.getElementById('img-' + id).src : ''
+        })),
+        isExercise: document.getElementById('is-exercise').value,
+        exerList: exers.map(id => ({
+            name: document.getElementById('ename-' + id).value,
+            str: document.getElementById('estr-' + id).value
+        })),
+        water: document.getElementById('r-water').value,
+        steps: document.getElementById('r-steps').value,
+        evil: document.getElementById('r-evil').value,
+        stress: document.getElementById('r-stress').value,
+        fatigue: document.getElementById('r-fatigue').value,
+        poop: document.getElementById('r-poop').value,
+        edema: document.getElementById('r-edema').value,
+        fullness: document.getElementById('r-fullness').value
+    };
+
+    // --- 修改這裡：換成你的 Render 網址 ---
+    const RENDER_URL = 'https://health-shortcuts.onrender.com/save'; 
+
+    showToast('連線中...');
+
+    fetch(RENDER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rec)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('雲端儲存成功！');
+            // 同步存一份到本地備份
+            const idx = records.findIndex(x => x.date === date);
+            if (idx >= 0) records[idx] = rec; else records.unshift(rec);
+            localStorage.setItem('hj_records', JSON.stringify(records));
+        } else {
+            alert('儲存失敗：' + data.message);
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('連線失敗，請檢查 Render 是否正常運作');
+    });
+}
+
+function exportData() {
+    const date = document.getElementById('r-date').value;
+    if (!date) { alert("請選擇日期"); return; }
+    showToast('圖片產生中...');
+
+    // 1. 建立一個不可見但存在的臨時容器 (優化渲染)
+    const element = document.createElement('div');
+    element.style.cssText = 'width:375px; background:#f7f5f2; padding:20px; font-family:Arial,sans-serif; position:absolute; top:0; left:-9999px;';
+
+    // 2. 準備數據與視覺進度條 (直接嵌入卡片風格)
+    const waterVal = document.getElementById('r-water').value || 0;
+    const waterPer = Math.min((waterVal / 2415) * 100, 100).toFixed(0);
+    const stepVal  = document.getElementById('r-steps').value || 0;
+    const stepPer  = Math.min((stepVal / 6000) * 100, 100).toFixed(0);
+
+    element.innerHTML = `
+      <div style="background:#fff; border-radius:15px; padding:20px; border:1px solid #e2ddd6;">
+        <div style="text-align:center; margin-bottom:20px;">
+          <h2 style="color:#c4773a; margin:0;">每日自檢健康報告</h2>
+          <div style="margin-top:5px; color:#6b6560; font-size:14px;">日期：${date}</div>
+        </div>
+
+        <div style="margin-bottom:15px; background:#f0f7ff; padding:15px; border-radius:12px; border:1px solid #d0e3f7;">
+          <div style="color:#4a90e2; font-size:12px; font-weight:bold; margin-bottom:5px;">喝水量（目標 2415ml）</div>
+          <div style="font-size:20px; font-weight:bold;">${waterVal} ml</div>
+          <div style="background:#e2ddd6; height:8px; border-radius:4px; margin-top:8px;"><div style="width:${waterPer}%; background:#4a90e2; height:8px; border-radius:4px;"></div></div>
+        </div>
+
+        <div style="margin-bottom:15px; background:#fff9f0; padding:15px; border-radius:12px; border:1px solid #f7e9d7;">
+          <div style="color:#c4773a; font-size:12px; font-weight:bold; margin-bottom:5px;">每日步數（目標 6000）</div>
+          <div style="font-size:20px; font-weight:bold;">${stepVal} 步</div>
+          <div style="background:#e2ddd6; height:8px; border-radius:4px; margin-top:8px;"><div style="width:${stepPer}%; background:#c4773a; height:8px; border-radius:4px;"></div></div>
+        </div>
+
+        <div style="background:#fdfaf5; padding:15px; border-radius:12px; border:1px solid #e2ddd6; margin-bottom:15px;">
+          <div style="font-weight:bold; color:#c4773a; margin-bottom:10px;">🍎 飲食統計</div>
+          <div style="display:flex; justify-content:space-around; text-align:center;">
+            <div><small>主食</small><br><b>${document.getElementById('val-carb').textContent}</b></div>
+            <div><small>蛋白</small><br><b>${document.getElementById('val-prot').textContent}</b></div>
+            <div><small>蔬菜</small><br><b>${document.getElementById('val-veg').textContent}</b></div>
+          </div>
+        </div>
+
+        <div style="background:#f0ede8; padding:15px; border-radius:12px; margin-bottom:15px;">
+          <div style="font-weight:bold; color:#6b6560; margin-bottom:10px;">🧠 身體指標</div>
+          <div style="display:flex; justify-content:space-between; text-align:center; font-size:12px;">
+            <div>壓力<br><b>${document.getElementById('r-stress').value || 0}</b></div>
+            <div>疲勞<br><b>${document.getElementById('r-fatigue').value || 0}</b></div>
+            <div>便便<br><b>${document.getElementById('r-poop').value || 0}</b></div>
+            <div>水腫<br><b>${document.getElementById('r-edema').value || 0}</b></div>
+            <div>飽足<br><b>${document.getElementById('r-fullness').value || 0}</b></div>
+          </div>
+        </div>
+
+        <div style="background:#f9f9f9; padding:12px; border-radius:10px; border:1px solid #eee; font-size:13px;">
+          <div style="margin-bottom:5px;"><b>邪惡食物：</b>${document.getElementById('r-evil').value}</div>
+          <div><b>今日運動：</b>${document.getElementById('is-exercise').value === '是' ? '✅ 有運動' : '❌ 未運動'}</div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(element);
+
+    // 3. 呼叫 html2canvas
+    html2canvas(element, {
+        scale: 2, // 提高解析度
+        backgroundColor: '#f7f5f2',
+        useCORS: true
+    }).then(canvas => {
+        // 4. 下載圖片
+        const link = document.createElement('a');
+        link.download = `自檢報告_${date}.jpg`;
+        link.href = canvas.toDataURL('image/jpeg', 0.9);
+        link.click();
+        
+        document.body.removeChild(element);
+        showToast('圖片已儲存至相簿');
+    }).catch(err => {
+        console.error(err);
+        alert('圖片產生失敗');
+        document.body.removeChild(element);
+    });
+}
+
+
+function importData(){
+    const input = document.createElement('input'); input.type = 'file'; input.accept = '.json';
+    input.onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (re) => { try { records = JSON.parse(re.target.result); localStorage.setItem('hj_records', JSON.stringify(records)); alert('匯入成功！'); onDateChange(); } catch(err) { alert('格式不正確'); } };
+        reader.readAsText(e.target.files[0]);
+    };
+    input.click();
+}
+
+
+function clearAllData(){ if(confirm('⚠️ 確定要清空所有歷史紀錄嗎？')){ localStorage.removeItem('hj_records'); records = []; onDateChange(); showToast('紀錄已清空'); } }
+
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast show'; setTimeout(()=>t.className='toast',2000); }
+
+window.onload=()=>{ document.getElementById('r-date').value=new Date().toISOString().split('T')[0]; onDateChange(); };
+</script>
+</body>
+</html>
