@@ -31,26 +31,43 @@ def test_db():
         return jsonify({"status": "連線失敗", "error": str(e)}), 500
 
 @app.route('/save', methods=['POST'])
+@app.route('/save', methods=['POST'])
 def save_data():
     data = request.json
     try:
         conn = pymysql.connect(**db_config)
         with conn.cursor() as cursor:
+            # 使用 ON DUPLICATE KEY UPDATE，如果日期重複就更新舊資料
             sql = """
-            INSERT INTO daily_records (record_date, water_intake, steps, exercise_status, stress_level, raw_json)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO daily_records (
+                record_date, water_intake, steps, exercise_status, 
+                stress_level, fatigue_level, poop_level, 
+                edema_level, fullness_level, evil_food, raw_json
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE 
+                water_intake=VALUES(water_intake), steps=VALUES(steps),
+                exercise_status=VALUES(exercise_status), stress_level=VALUES(stress_level),
+                fatigue_level=VALUES(fatigue_level), poop_level=VALUES(poop_level),
+                edema_level=VALUES(edema_level), fullness_level=VALUES(fullness_level),
+                evil_food=VALUES(evil_food), raw_json=VALUES(raw_json)
             """
             cursor.execute(sql, (
                 data.get('date'),
-                data.get('water', 0),
-                data.get('steps', 0),
+                data.get('water') or 0,
+                data.get('steps') or 0,
                 data.get('isExercise', '否'),
-                data.get('stress', 0),
+                data.get('stress') or 0,
+                data.get('fatigue') or 0,
+                data.get('poop') or 0,
+                data.get('edema') or 0,
+                data.get('fullness') or 0,
+                data.get('evil', '否'),
                 json.dumps(data)
             ))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "資料已存入 Aiven 雲端！"})
+        return jsonify({"status": "success", "message": "完整數據已同步至 Aiven 雲端！"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
