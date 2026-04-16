@@ -384,6 +384,10 @@ function exportData() {
       <div style="background:#fff; border-radius:15px; padding:20px; border:1px solid #e2ddd6;">
         <div style="text-align:center; margin-bottom:20px;">
           <h2 style="color:#c4773a; margin:0;">每日自檢健康報告</h2>
+          <div id="db-status" style="font-size: 13px; color: #888; margin-top: 5px;">
+            <span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:gray; margin-right:5px;"></span>
+            系統連線檢查中...
+        </div>
           <div style="margin-top:5px; color:#6b6560; font-size:14px;">日期：${date}</div>
         </div>
 
@@ -460,7 +464,34 @@ function importData(){
     input.click();
 }
 
+async function checkSystemStatus() {
+    const statusText = document.querySelector('#db-status');
+    const statusDot = document.querySelector('#status-dot');
+    const RENDER_URL = "https://你的服務.onrender.com"; // 請替換成你的網址
 
+    try {
+        // 嘗試呼叫後端的一個簡單路徑 (例如首頁或特定的 /health)
+        const start = Date.now();
+        const response = await fetch(`${RENDER_URL}/health`, { method: 'GET' });
+        const latency = Date.now() - start;
+
+        if (response.ok) {
+            statusDot.style.background = "#2ecc71"; // 綠色
+            statusText.innerHTML = `<span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#2ecc71; margin-right:5px;"></span> 系統已連線 (${latency}ms)`;
+        } else {
+            throw new Error();
+        }
+    } catch (error) {
+        statusDot.style.background = "#e74c3c"; // 紅色
+        statusText.innerHTML = `<span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#e74c3c; margin-right:5px;"></span> 資料庫休眠中 (請重啟 Aiven)`;
+        
+        // 可選：自動彈出提醒
+        // alert("提醒：資料庫目前連線失敗，請檢查 Aiven 是否已關閉。");
+    }
+}
+
+// 網頁開啟後立刻檢查
+window.addEventListener('load', checkSystemStatus);
 function clearAllData(){ if(confirm('⚠️ 確定要清空所有歷史紀錄嗎？')){ localStorage.removeItem('hj_records'); records = []; onDateChange(); showToast('紀錄已清空'); } }
 
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast show'; setTimeout(()=>t.className='toast',2000); }
