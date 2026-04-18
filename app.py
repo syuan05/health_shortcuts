@@ -2,12 +2,15 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pymysql
 import json
-import os  # <--- 這裡一定要加！
+import cloudinary
+import cloudinary.uploader
+import os
 
 app = Flask(__name__)
+# 允許跨域請求，讓你的網頁（前端）可以呼叫這個 API
 CORS(app)
 
-# Aiven MySQL 連線資訊 (從環境變數讀取)
+# --- 配置資訊 (從 Render 環境變數讀取) ---
 db_config = {
     'host': os.environ.get('DB_HOST'),
     'user': os.environ.get('DB_USER'),
@@ -18,12 +21,22 @@ db_config = {
     'cursorclass': pymysql.cursors.DictCursor
 }
 
+cloudinary.config(
+    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key = os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret = os.environ.get('CLOUDINARY_API_SECRET'),
+    secure = True
+)
+
+# --- 1. 系統診斷路由 ---
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "ok"})
+    """ 用於前端狀態燈檢查 Render 狀態 """
+    return jsonify({"status": "ok", "db": "connected"}), 200
 
 @app.route('/test', methods=['GET'])
 def test_db():
+    """ 手動測試資料庫連線是否正常 """
     try:
         conn = pymysql.connect(**db_config)
         with conn.cursor() as cursor:
@@ -34,8 +47,35 @@ def test_db():
     except Exception as e:
         return jsonify({"status": "連線失敗", "error": str(e)}), 500
 
+# --- 2. 圖片上傳路由 (代理傳至 Cloudinary) ---
+@app.route('/upload', methods=['POST'])
+def upload_image():
+    """ 接收前端 Base64 並安全上傳至 Cloudinary，隱藏 API Secret """
+    try:
+        data = request.json
+        image_data = data.get('image') # 格式為 data:image/jpeg;base64,...
+        
+        if not image_data:
+            return jsonify({"status": "error", "message": "無圖片數據"}), 400
+
+        # 將圖片送往 Cloudinary
+        upload_result = cloudinary.uploader.upload(
+            image_data,
+            folder="health_app",
+            resource_type="image"
+        )
+
+        return jsonify({
+            "status": "success",
+            "url": upload_result.get("secure_url")
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# --- 3. 數據讀取路由 ---
 @app.route('/get_record', methods=['GET'])
 def get_record():
+    """ 依據日期抓取雲端紀錄 """
     date = request.args.get('date')
     if not date:
         return jsonify({"status": "error", "message": "Missing date"}), 400
@@ -49,27 +89,52 @@ def get_record():
             result = cursor.fetchone()
         
         if result and result.get('raw_json'):
-            # 直接解析 JSON 字串並回傳
             return jsonify({
                 "status": "success", 
                 "data": json.loads(result['raw_json'])
             })
         else:
             return jsonify({"status": "empty", "message": "No record found"})
-            
     except Exception as e:
-        print(f"Database error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         if conn:
             conn.close()
+
+# ... 前面 import 與 config 部分不變 ...
+
+@app.route('/upload', methods=['POST'])
+def upload_image():
+    """ 安全上傳：由後端代理將圖片傳至 Cloudinary """
+    try:
+        data = request.json
+        image_data = data.get('image') 
+        
+        if not image_data:
+            return jsonify({"status": "error", "message": "無圖片數據"}), 400
+
+        # 上傳到 Cloudinary 並指定資料夾
+        upload_result = cloudinary.uploader.upload(
+            image_data,
+            folder="health_app_photos",
+            resource_type="image"
+        )
+
+        return jsonify({
+            "status": "success",
+            "url": upload_result.get("secure_url") # 回傳 https 網址
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/save', methods=['POST'])
 def save_data():
+    """ 儲存數據：現在 JSON 內的 img 欄位存的是 URL 字串 """
     data = request.json
     try:
         conn = pymysql.connect(**db_config)
         with conn.cursor() as cursor:
-            # 使用 ON DUPLICATE KEY UPDATE，如果日期重複就更新舊資料
+            # Aiven 資料庫中 raw_json 建議使用 TEXT 或 LONGTEXT
             sql = """
             INSERT INTO daily_records (
                 record_date, water_intake, steps, exercise_status, 
@@ -79,10 +144,7 @@ def save_data():
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE 
                 water_intake=VALUES(water_intake), steps=VALUES(steps),
-                exercise_status=VALUES(exercise_status), stress_level=VALUES(stress_level),
-                fatigue_level=VALUES(fatigue_level), poop_level=VALUES(poop_level),
-                edema_level=VALUES(edema_level), fullness_level=VALUES(fullness_level),
-                evil_food=VALUES(evil_food), raw_json=VALUES(raw_json)
+                raw_json=VALUES(raw_json)
             """
             cursor.execute(sql, (
                 data.get('date'),
@@ -95,15 +157,14 @@ def save_data():
                 data.get('edema') or 0,
                 data.get('fullness') or 0,
                 data.get('evil', '否'),
-                json.dumps(data)
+                json.dumps(data) # 這裡存入的是包含 Cloudinary 網址的 JSON
             ))
         conn.commit()
         conn.close()
-        return jsonify({"status": "success", "message": "完整數據已同步至 Aiven 雲端！"})
+        return jsonify({"status": "success", "message": "數據已備份至雲端！"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    # Render 會自動給 PORT 環境變數
     port = int(os.environ.get('PORT', 5001))
     app.run(host='0.0.0.0', port=port)

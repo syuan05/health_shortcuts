@@ -156,25 +156,51 @@ const goals={carb:3, prot:3, veg:4, water:2415};
 let records=JSON.parse(localStorage.getItem('hj_records')||'[]'); 
 let meals=[], mealIdCtr=0, exers=[], exerIdCtr=0;
 
-function handleImage(id, file) {
+async function handleImage(id, file) {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 400;
-            const scale = MAX_WIDTH / img.width;
-            canvas.width = MAX_WIDTH;
-            canvas.height = img.height * scale;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            document.getElementById(`img-${id}`).src = canvas.toDataURL('image/jpeg', 0.6);
-            document.getElementById(`preview-${id}`).style.display = 'block';
+    
+    showToast('上傳圖片中...');
+
+    // 前端先做基本壓縮，避免傳給 Render 太大導致超時
+    const compressedBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 800; 
+                const scale = MAX_WIDTH / img.width;
+                canvas.width = MAX_WIDTH;
+                canvas.height = img.height * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7)); // 壓縮品質 0.7
+            };
         };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    });
+
+    try {
+        const res = await fetch(`${BASE_URL}/upload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: compressedBase64 })
+        });
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            const imgEl = document.getElementById(`img-${id}`);
+            imgEl.src = data.url; // 這裡顯示的是 https://res.cloudinary.com/...
+            imgEl.dataset.url = data.url; // 將網址存在 dataset
+            document.getElementById(`preview-${id}`).style.display = 'block';
+            showToast('雲端備份成功！');
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (err) {
+        alert('圖片上傳失敗：' + err.message);
+    }
 }
 
 function toggleExercise(){ document.getElementById('exercise-content').style.display=(document.getElementById('is-exercise').value==='是'?'block':'none'); if(exers.length===0 && document.getElementById('is-exercise').value==='是')addExer(); }
@@ -316,18 +342,22 @@ function addExer(d=null){
 
 function saveRecord() {
     const date = document.getElementById('r-date').value;
-    if (!date) { alert("請選擇日期"); return; }
+    if (!date) return alert("請選擇日期");
 
     const rec = {
         date: date,
-        meals: meals.map(id => ({
-            type: document.getElementById('mtype-' + id).value,
-            carb: document.getElementById('mcarb-' + id).value,
-            prot: document.getElementById('mprot-' + id).value,
-            veg: document.getElementById('mveg-' + id).value,
-            note: document.getElementById('mnote-' + id).value,
-            img: document.getElementById('img-' + id).src.startsWith('data:') ? document.getElementById('img-' + id).src : ''
-        })),
+        meals: meals.map(id => {
+            const imgEl = document.getElementById('img-' + id);
+            return {
+                type: document.getElementById('mtype-' + id).value,
+                carb: document.getElementById('mcarb-' + id).value,
+                prot: document.getElementById('mprot-' + id).value,
+                veg: document.getElementById('mveg-' + id).value,
+                note: document.getElementById('mnote-' + id).value,
+                // 優先使用 dataset.url (剛上傳的)，否則看 src 是否為 http 網址
+                img: imgEl.dataset.url || (imgEl.src.startsWith('http') ? imgEl.src : '')
+            };
+        }),
         isExercise: document.getElementById('is-exercise').value,
         exerList: exers.map(id => ({
             name: document.getElementById('ename-' + id).value,
@@ -343,32 +373,18 @@ function saveRecord() {
         fullness: document.getElementById('r-fullness').value
     };
 
-    // --- 修改這裡：換成你的 Render 網址 ---
-    const RENDER_URL = 'https://health-shortcuts.onrender.com/save'; 
-
-    showToast('連線中...');
-
-    fetch(RENDER_URL, {
+    showToast('儲存中...');
+    fetch(`${BASE_URL}/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(rec)
     })
     .then(res => res.json())
-    .then(data => {
-        if (data.status === 'success') {
-            showToast('雲端儲存成功！');
-            // 同步存一份到本地備份
-            const idx = records.findIndex(x => x.date === date);
-            if (idx >= 0) records[idx] = rec; else records.unshift(rec);
-            localStorage.setItem('hj_records', JSON.stringify(records));
-        } else {
-            alert('儲存失敗：' + data.message);
-        }
+    .then(d => { 
+        if(d.status==='success') showToast('數據同步成功！'); 
+        else alert(d.message); 
     })
-    .catch(err => {
-        console.error('Error:', err);
-        alert('連線失敗，請檢查 Render 是否正常運作');
-    });
+    .catch(e => alert('連線失敗'));
 }
 
 function exportData() {
