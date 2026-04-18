@@ -84,10 +84,10 @@ input, select {
 <body>
     <div class="app">
         <div class="card" style="text-align: center; padding: 10px;">
-          <div id="db-status" style="font-size: 13px; color: #888;">
-              <span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:gray; margin-right:5px;"></span>
-              系統連線檢查中...
-          </div>
+            <div id="db-status" style="font-size: 13px; color: #888;">
+                <span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:gray; margin-right:5px;"></span>
+                <span id="status-text">系統連線檢查中...</span>
+            </div>
         </div>
       
         <div class="card"><label class="lbl">日期</label><input type="date" id="r-date" onchange="onDateChange()"></div>
@@ -467,43 +467,67 @@ function importData(){
 }
 
 async function checkSystemStatus() {
-    const statusText = document.querySelector('#db-status');
+    const statusText = document.querySelector('#status-text');
     const statusDot = document.querySelector('#status-dot');
-    const RENDER_URL = "https://health-shortcuts.onrender.com"; // 請替換成你的網址
+    const RENDER_URL = "https://health-shortcuts.onrender.com"; 
 
-    try {
-        // 嘗試呼叫後端的一個簡單路徑 (例如首頁或特定的 /health)
-        const start = Date.now();
-        const response = await fetch(`${RENDER_URL}/health`, { method: 'GET' });
-        const latency = Date.now() - start;
-
-        if (response.ok) {
-            statusDot.style.background = "#2ecc71"; // 綠色
-            statusText.innerHTML = `<span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#2ecc71; margin-right:5px;"></span> 系統已連線 (${latency}ms)`;
-        } else {
-            throw new Error();
+    async function performCheck() {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            const start = Date.now();
+            
+            await fetch(`${RENDER_URL}/health`, {
+                method: 'GET',
+                signal: controller.signal,
+                cache: "no-cache",
+                mode: 'no-cors'  // ← 加這行！避免 CORS 讓 fetch 直接丟 exception
+            });
+            clearTimeout(timeoutId);
+            
+            const latency = Date.now() - start;
+            statusDot.style.background = "#2ecc71";
+            statusText.innerText = `系統已連線 (${latency}ms)`;
+            return true;
+        } catch (error) {
+            console.log("連線嘗試中...", error);
         }
-    } catch (error) {
-        statusDot.style.background = "#e74c3c"; // 紅色
-        statusText.innerHTML = `<span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#e74c3c; margin-right:5px;"></span> 資料庫休眠中 (請重啟 Aiven)`;
-        
-        // 可選：自動彈出提醒
-        // alert("提醒：資料庫目前連線失敗，請檢查 Aiven 是否已關閉。");
+        return false;
+    }
+
+    statusDot.style.background = "#f1c40f";
+    statusText.innerText = "檢測中...";
+
+    const isOk = await performCheck();
+
+    if (!isOk) {
+        statusText.innerText = "伺服器喚醒中...";
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        const retryOk = await performCheck();
+
+        if (!retryOk) {
+            statusDot.style.background = "#e74c3c";
+            statusText.innerText = "資料庫休眠中 (請檢查 Aiven)";
+        }
     }
 }
 
 // 網頁開啟後立刻檢查
-window.addEventListener('load', checkSystemStatus);
+
 function clearAllData(){ if(confirm('⚠️ 確定要清空所有歷史紀錄嗎？')){ localStorage.removeItem('hj_records'); records = []; onDateChange(); showToast('紀錄已清空'); } }
 
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast show'; setTimeout(()=>t.className='toast',2000); }
 
-window.onload = () => {
-    // 設定今日日期
+window.onload = async () => {
+    // 1. 設定今日日期
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('r-date').value = today;
     
-    // 主動執行讀取
+    // 2. 先執行連線檢測
+    await checkSystemStatus(); 
+    
+    // 3. 診斷跑完後（不論成功失敗）再讀取數據
     onDateChange(); 
 };
 </script>

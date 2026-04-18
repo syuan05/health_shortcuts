@@ -18,6 +18,10 @@ db_config = {
     'cursorclass': pymysql.cursors.DictCursor
 }
 
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "ok"})
+
 @app.route('/test', methods=['GET'])
 def test_db():
     try:
