@@ -47,27 +47,26 @@ def test_db():
     except Exception as e:
         return jsonify({"status": "連線失敗", "error": str(e)}), 500
 
-# --- 2. 圖片上傳路由 (代理傳至 Cloudinary) ---
 @app.route('/upload', methods=['POST'])
 def upload_image():
-    """ 接收前端 Base64 並安全上傳至 Cloudinary，隱藏 API Secret """
+    """ 安全上傳：由後端代理將圖片傳至 Cloudinary """
     try:
         data = request.json
-        image_data = data.get('image') # 格式為 data:image/jpeg;base64,...
+        image_data = data.get('image') 
         
         if not image_data:
             return jsonify({"status": "error", "message": "無圖片數據"}), 400
 
-        # 將圖片送往 Cloudinary
+        # 上傳到 Cloudinary 並指定資料夾
         upload_result = cloudinary.uploader.upload(
             image_data,
-            folder="health_app",
+            folder="health_app_photos",
             resource_type="image"
         )
 
         return jsonify({
             "status": "success",
-            "url": upload_result.get("secure_url")
+            "url": upload_result.get("secure_url") # 回傳 https 網址
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -101,31 +100,7 @@ def get_record():
         if conn:
             conn.close()
 
-# ... 前面 import 與 config 部分不變 ...
 
-@app.route('/upload', methods=['POST'])
-def upload_image():
-    """ 安全上傳：由後端代理將圖片傳至 Cloudinary """
-    try:
-        data = request.json
-        image_data = data.get('image') 
-        
-        if not image_data:
-            return jsonify({"status": "error", "message": "無圖片數據"}), 400
-
-        # 上傳到 Cloudinary 並指定資料夾
-        upload_result = cloudinary.uploader.upload(
-            image_data,
-            folder="health_app_photos",
-            resource_type="image"
-        )
-
-        return jsonify({
-            "status": "success",
-            "url": upload_result.get("secure_url") # 回傳 https 網址
-        })
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/save', methods=['POST'])
 def save_data():
