@@ -374,8 +374,62 @@ async function onDateChange() {
         console.error('讀取失敗:', err);
         showToast('無法連線雲端');
     }
-    // 最後重新計算進度條，確保進度條也歸零
+    loadDraft(date); // 嘗試載入這天的未儲存草稿
     setTimeout(() => calcAll(), 100); 
+}
+
+// --- 自動暫存草稿功能 ---
+
+// 1. 定義哪些欄位需要自動暫存 (排除日期，因為日期改變應載入對應紀錄)
+const AUTO_SAVE_FIELDS = [
+    'r-steps', 'r-water', 'is-exercise', 'r-stress', 
+    'r-fatigue', 'r-poop', 'r-edema', 'r-fullness', 'r-evil'
+];
+
+// 2. 監聽輸入事件：當使用者打字或改選單時，立刻存入 localStorage
+document.addEventListener('input', (e) => {
+    if (AUTO_SAVE_FIELDS.includes(e.target.id)) {
+        const draftKey = `draft_${document.getElementById('r-date').value}`;
+        saveCurrentStateToDraft(draftKey);
+    }
+});
+
+// 將當前畫面所有數值打包存成草稿
+function saveCurrentStateToDraft(key) {
+    const draftData = {
+        water: document.getElementById('r-water').value,
+        steps: document.getElementById('r-steps').value,
+        isExercise: document.getElementById('is-exercise').value,
+        evil: document.getElementById('r-evil').value,
+        stress: document.getElementById('r-stress').value,
+        fatigue: document.getElementById('r-fatigue').value,
+        poop: document.getElementById('r-poop').value,
+        edema: document.getElementById('r-edema').value,
+        fullness: document.getElementById('r-fullness').value,
+        // 餐點部分比較複雜，可以先暫存基本欄位，確保不丟失大項
+    };
+    localStorage.setItem(key, JSON.stringify(draftData));
+}
+
+// 3. 載入草稿：當切換日期或載入網頁時呼叫
+function loadDraft(date) {
+    const draftData = JSON.parse(localStorage.getItem(`draft_${date}`));
+    if (!draftData) return;
+
+    // 如果目前欄位是空的，才把暫存填回去 (避免覆蓋掉雲端已存好的資料)
+    if (!document.getElementById('r-water').value) document.getElementById('r-water').value = draftData.water || "";
+    if (!document.getElementById('r-steps').value) document.getElementById('r-steps').value = draftData.steps || "";
+    document.getElementById('is-exercise').value = draftData.isExercise || "否";
+    document.getElementById('r-evil').value = draftData.evil || "否";
+    
+    const bodyFields = ['stress', 'fatigue', 'poop', 'edema', 'fullness'];
+    bodyFields.forEach(f => {
+        const el = document.getElementById('r-' + f);
+        if (el && !el.value) el.value = draftData[f] || "";
+    });
+    
+    toggleExercise(); // 確保運動區塊顯示狀態正確
+    calcAll();       // 重新計算進度條
 }
 
 function addMeal(d = null) {
@@ -519,6 +573,7 @@ async function saveRecord() {
 
         if (saveData.status === 'success') {
             showToast('所有數據與照片已成功同步！');
+            localStorage.removeItem(`draft_${date}`);
             // 上傳完後，把畫面的 src 換成真正的 URL，避免重複上傳
             onDateChange(); 
         } else {
