@@ -191,8 +191,10 @@ async function handleImage(id, file) {
         
         if (data.status === 'success') {
             const imgEl = document.getElementById(`img-${id}`);
-            imgEl.src = data.url; // 這裡顯示的是 https://res.cloudinary.com/...
-            imgEl.dataset.url = data.url; // 將網址存在 dataset
+            // --- 修改這裡 ---
+            imgEl.src = data.url;         // 將預覽圖直接換成網路 URL
+            imgEl.dataset.url = data.url; // 確保 dataset 也有存到
+            // ----------------
             document.getElementById(`preview-${id}`).style.display = 'block';
             showToast('雲端備份成功！');
         } else {
