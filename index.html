@@ -160,9 +160,7 @@ let meals=[], mealIdCtr=0, exers=[], exerIdCtr=0;
 async function handleImage(id, file) {
     if (!file) return;
     
-    showToast('上傳圖片中...');
-
-    // 前端先做基本壓縮，避免傳給 Render 太大導致超時
+    // 這裡只做預覽與壓縮，不呼叫後端上傳
     const compressedBase64 = await new Promise((resolve) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -177,33 +175,14 @@ async function handleImage(id, file) {
                 canvas.height = img.height * scale;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/jpeg', 0.7)); // 壓縮品質 0.7
+                resolve(canvas.toDataURL('image/jpeg', 0.7)); 
             };
         };
     });
 
-    try {
-        const res = await fetch(`${BASE_URL}/upload`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: compressedBase64 })
-        });
-        const data = await res.json();
-        
-        if (data.status === 'success') {
-            const imgEl = document.getElementById(`img-${id}`);
-            // --- 修改這裡 ---
-            imgEl.src = data.url;         // 將預覽圖直接換成網路 URL
-            imgEl.dataset.url = data.url; // 確保 dataset 也有存到
-            // ----------------
-            document.getElementById(`preview-${id}`).style.display = 'block';
-            showToast('雲端備份成功！');
-        } else {
-            throw new Error(data.message);
-        }
-    } catch (err) {
-        alert('圖片上傳失敗：' + err.message);
-    }
+    const imgEl = document.getElementById(`img-${id}`);
+    imgEl.src = compressedBase64; // 此時 src 是 base64，僅供預覽
+    document.getElementById(`preview-${id}`).style.display = 'block';
 }
 
 function toggleExercise(){ document.getElementById('exercise-content').style.display=(document.getElementById('is-exercise').value==='是'?'block':'none'); if(exers.length===0 && document.getElementById('is-exercise').value==='是')addExer(); }
@@ -343,51 +322,82 @@ function addExer(d=null){
     document.getElementById('exer-wrap').appendChild(div);
 }
 
-function saveRecord() {
+async function saveRecord() {
     const date = document.getElementById('r-date').value;
     if (!date) return alert("請選擇日期");
 
-    const rec = {
-        date: date,
-        meals: meals.map(id => {
+    showToast('正在處理圖片與同步數據...');
+
+    try {
+        // 1. 處理所有餐點，如果圖片是 base64 就上傳，如果是網址就保留
+        const updatedMeals = await Promise.all(meals.map(async (id) => {
             const imgEl = document.getElementById('img-' + id);
+            let finalImgUrl = "";
+
+            // 檢查圖片是否需要上傳 (如果是 base64 開頭代表是新選的照片)
+            if (imgEl.src.startsWith('data:image')) {
+                const res = await fetch(`${BASE_URL}/upload`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imgEl.src })
+                });
+                const uploadData = await res.json();
+                if (uploadData.status === 'success') {
+                    finalImgUrl = uploadData.url;
+                }
+            } else if (imgEl.src.startsWith('http')) {
+                // 如果已經是雲端網址 (讀取舊紀錄時)，直接保留
+                finalImgUrl = imgEl.src;
+            }
+
             return {
                 type: document.getElementById('mtype-' + id).value,
                 carb: document.getElementById('mcarb-' + id).value,
                 prot: document.getElementById('mprot-' + id).value,
                 veg: document.getElementById('mveg-' + id).value,
                 note: document.getElementById('mnote-' + id).value,
-                // 優先使用 dataset.url (剛上傳的)，否則看 src 是否為 http 網址
-                img: imgEl.dataset.url || (imgEl.src.startsWith('http') ? imgEl.src : '')
+                img: finalImgUrl
             };
-        }),
-        isExercise: document.getElementById('is-exercise').value,
-        exerList: exers.map(id => ({
-            name: document.getElementById('ename-' + id).value,
-            str: document.getElementById('estr-' + id).value
-        })),
-        water: document.getElementById('r-water').value,
-        steps: document.getElementById('r-steps').value,
-        evil: document.getElementById('r-evil').value,
-        stress: document.getElementById('r-stress').value,
-        fatigue: document.getElementById('r-fatigue').value,
-        poop: document.getElementById('r-poop').value,
-        edema: document.getElementById('r-edema').value,
-        fullness: document.getElementById('r-fullness').value
-    };
+        }));
 
-    showToast('儲存中...');
-    fetch(`${BASE_URL}/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rec)
-    })
-    .then(res => res.json())
-    .then(d => { 
-        if(d.status==='success') showToast('數據同步成功！'); 
-        else alert(d.message); 
-    })
-    .catch(e => alert('連線失敗'));
+        // 2. 組裝完整資料
+        const rec = {
+            date: date,
+            meals: updatedMeals,
+            isExercise: document.getElementById('is-exercise').value,
+            exerList: exers.map(id => ({
+                name: document.getElementById('ename-' + id).value,
+                str: document.getElementById('estr-' + id).value
+            })),
+            water: document.getElementById('r-water').value,
+            steps: document.getElementById('r-steps').value,
+            evil: document.getElementById('r-evil').value,
+            stress: document.getElementById('r-stress').value,
+            fatigue: document.getElementById('r-fatigue').value,
+            poop: document.getElementById('r-poop').value,
+            edema: document.getElementById('r-edema').value,
+            fullness: document.getElementById('r-fullness').value
+        };
+
+        // 3. 傳送到後端 save 路由
+        const saveRes = await fetch(`${BASE_URL}/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(rec)
+        });
+        const saveData = await saveRes.json();
+
+        if (saveData.status === 'success') {
+            showToast('所有數據與照片已成功同步！');
+            // 上傳完後，把畫面的 src 換成真正的 URL，避免重複上傳
+            onDateChange(); 
+        } else {
+            alert(saveData.message);
+        }
+    } catch (e) {
+        console.error(e);
+        alert('儲存失敗，請檢查網路或伺服器狀態');
+    }
 }
 
 function exportData() {
