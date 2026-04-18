@@ -153,6 +153,7 @@ input, select {
 <script>
 const mealTypes=['早餐','午餐','晚餐','點心','宵夜']; 
 const goals={carb:3, prot:3, veg:4, water:2415};
+const BASE_URL = "https://health-shortcuts.onrender.com";
 let records=JSON.parse(localStorage.getItem('hj_records')||'[]'); 
 let meals=[], mealIdCtr=0, exers=[], exerIdCtr=0;
 
