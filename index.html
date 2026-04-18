@@ -292,7 +292,6 @@ async function onDateChange() {
     showToast('雲端讀取中...');
 
     try {
-        // 加上 timestamp 避免瀏覽器快取舊資料
         const response = await fetch(`https://health-shortcuts.onrender.com/get_record?date=${date}&t=${new Date().getTime()}`);
         const cloud = await response.json();
 
@@ -306,11 +305,11 @@ async function onDateChange() {
         }
 
         if (r) {
-            // 先還原飲食 (必須先跑 addMeal 建立 DOM 元素，才能賦值)
+            // 還原飲食
             if (r.meals && r.meals.length > 0) {
                 r.meals.forEach(m => addMeal(m));
             } else {
-                addMeal(); // 如果沒餐點，至少開一個空白的
+                addMeal();
             }
 
             // 還原運動
@@ -330,18 +329,32 @@ async function onDateChange() {
                 if (el) el.value = r[f] || "";
             });
         } else {
-            // 完全沒資料的情況
-            addMeal();
-            document.getElementById('is-exercise').value = '否';
+            // --- 重點修正：當這天沒資料時，強制重置所有輸入欄位 ---
+            addMeal(); // 開一個空白餐點
+            document.getElementById('is-exercise').value = '否'; // 重置運動開關
             toggleExercise();
+
+            // 重置生活數據為空
+            document.getElementById('r-water').value = "";
+            document.getElementById('r-steps').value = "";
+            document.getElementById('r-evil').value = '否';
+
+            // 重置身體狀況所有項目
+            const bodyFields = ['stress', 'fatigue', 'poop', 'edema', 'fullness'];
+            bodyFields.forEach(f => {
+                const el = document.getElementById('r-' + f);
+                if (el) el.value = ""; 
+            });
+            // -------------------------------------------
         }
     } catch (err) {
         console.error('讀取失敗:', err);
         showToast('無法連線雲端');
     }
-    // 最後務必重新計算進度條
+    // 最後重新計算進度條，確保進度條也歸零
     setTimeout(() => calcAll(), 100); 
 }
+
 function addMeal(d = null) {
     const id = ++mealIdCtr;
     meals.push(id);
