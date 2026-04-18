@@ -82,10 +82,16 @@ input, select {
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="card"><label class="lbl">日期</label><input type="date" id="r-date" onchange="onDateChange()"></div>
-  
-  <div class="card">
+    <div class="app">
+        <div class="card" style="text-align: center; padding: 10px;">
+          <div id="db-status" style="font-size: 13px; color: #888;">
+              <span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:gray; margin-right:5px;"></span>
+              系統連線檢查中...
+          </div>
+        </div>
+      
+        <div class="card"><label class="lbl">日期</label><input type="date" id="r-date" onchange="onDateChange()"></div>
+    <div class="card">
     <div class="card-title">飲食進度</div>
     <div class="total-box">
       <div class="total-item"><div class="lbl">主食(3)</div><div id="val-carb" class="total-val">0</div><div class="progress-bg"><div id="bar-carb" class="progress-bar" style="background:var(--accent)"></div></div></div>
@@ -384,10 +390,6 @@ function exportData() {
       <div style="background:#fff; border-radius:15px; padding:20px; border:1px solid #e2ddd6;">
         <div style="text-align:center; margin-bottom:20px;">
           <h2 style="color:#c4773a; margin:0;">每日自檢健康報告</h2>
-          <div id="db-status" style="font-size: 13px; color: #888; margin-top: 5px;">
-            <span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:gray; margin-right:5px;"></span>
-            系統連線檢查中...
-        </div>
           <div style="margin-top:5px; color:#6b6560; font-size:14px;">日期：${date}</div>
         </div>
 
@@ -467,7 +469,7 @@ function importData(){
 async function checkSystemStatus() {
     const statusText = document.querySelector('#db-status');
     const statusDot = document.querySelector('#status-dot');
-    const RENDER_URL = "https://你的服務.onrender.com"; // 請替換成你的網址
+    const RENDER_URL = "https://health-shortcuts.onrender.com"; // 請替換成你的網址
 
     try {
         // 嘗試呼叫後端的一個簡單路徑 (例如首頁或特定的 /health)
