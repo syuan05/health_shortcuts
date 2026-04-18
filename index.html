@@ -179,7 +179,33 @@ input, select {
         <div><label class="lbl">水腫</label><div class="combo-wrap"><input type="number" id="r-edema" placeholder="0"><select class="combo-select" onchange="this.previousElementSibling.value=this.value"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div></div>
         <div><label class="lbl">飽足</label><div class="combo-wrap"><input type="number" id="r-fullness" placeholder="0"><select class="combo-select" onchange="this.previousElementSibling.value=this.value"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div></div>
     </div>
-  </div>
+
+    <div style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;">
+        <div style="display: flex; align-items: flex-end; gap: 8px;">
+            <div style="width: 75px;">
+                <label class="lbl">睡眠</label>
+                <div class="combo-wrap">
+                    <input type="number" id="r-sleep-score" placeholder="0">
+                    <select class="combo-select" onchange="this.previousElementSibling.value=this.value">
+                        <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+                    </select>
+                </div>
+            </div>
+            <div style="flex: 1;">
+                <label class="lbl">入睡時間</label>
+                <input type="time" id="r-sleep-start" onchange="calcSleepTime()" style="padding: 4px;">
+            </div>
+            <div style="flex: 1;">
+                <label class="lbl">醒來時間</label>
+                <input type="time" id="r-sleep-end" onchange="calcSleepTime()" style="padding: 4px;">
+            </div>
+        </div>
+        
+        <div id="sleep-duration-hint" style="font-size: 11px; color: var(--accent); margin-top: 8px; font-weight: 500; text-align: right; display: none;">
+            💤 約睡了 <span id="sleep-total-txt">0 小時 0 分</span>
+        </div>
+    </div>
+</div>
 
   <button class="btn-save" onclick="saveRecord()">儲存今日數據</button>
 
@@ -305,7 +331,7 @@ async function onDateChange() {
     const date = document.getElementById('r-date').value;
     if (!date) return;
 
-    // 清空目前畫面
+    // 1. 清空目前畫面與暫存變數
     const mealsWrap = document.getElementById('meals-wrap');
     const exerWrap = document.getElementById('exer-wrap');
     mealsWrap.innerHTML = '';
@@ -328,53 +354,67 @@ async function onDateChange() {
         }
 
         if (r) {
-            // 還原飲食
+            // 2. 還原睡眠資料 (依照新版欄位名稱)
+            document.getElementById('r-sleep-score').value = r.sleepScore || "";
+            document.getElementById('r-sleep-start').value = r.sleepStart || "";
+            document.getElementById('r-sleep-end').value = r.sleepEnd || "";
+            calcSleepTime(); // 載入後立刻計算總時數顯示
+
+            // 3. 還原飲食紀錄
             if (r.meals && r.meals.length > 0) {
                 r.meals.forEach(m => addMeal(m));
             } else {
                 addMeal();
             }
 
-            // 還原運動
+            // 4. 還原運動紀錄
             document.getElementById('is-exercise').value = r.isExercise || '否';
             toggleExercise();
             if (r.exerList) r.exerList.forEach(e => addExer(e));
 
-            // 還原生活數據
+            // 5. 還原生活數據
             document.getElementById('r-water').value = r.water || "";
             document.getElementById('r-steps').value = r.steps || "";
             document.getElementById('r-evil').value = r.evil || '否';
 
-            // 還原身體狀況
+            // 6. 還原身體狀況指標
             const bodyFields = ['stress', 'fatigue', 'poop', 'edema', 'fullness'];
             bodyFields.forEach(f => {
                 const el = document.getElementById('r-' + f);
                 if (el) el.value = r[f] || "";
             });
+
         } else {
-            // --- 重點修正：當這天沒資料時，強制重置所有輸入欄位 ---
-            addMeal(); // 開一個空白餐點
-            document.getElementById('is-exercise').value = '否'; // 重置運動開關
+            // --- 沒資料時的重置邏輯 ---
+            addMeal(); 
+            document.getElementById('is-exercise').value = '否';
             toggleExercise();
 
-            // 重置生活數據為空
+            // 重置睡眠欄位
+            document.getElementById('r-sleep-score').value = "";
+            document.getElementById('r-sleep-start').value = "";
+            document.getElementById('r-sleep-end').value = "";
+            document.getElementById('sleep-duration-hint').style.display = 'none';
+
+            // 重置生活與身體指標
             document.getElementById('r-water').value = "";
             document.getElementById('r-steps').value = "";
             document.getElementById('r-evil').value = '否';
-
-            // 重置身體狀況所有項目
-            const bodyFields = ['stress', 'fatigue', 'poop', 'edema', 'fullness'];
-            bodyFields.forEach(f => {
+            
+            ['stress', 'fatigue', 'poop', 'edema', 'fullness'].forEach(f => {
                 const el = document.getElementById('r-' + f);
                 if (el) el.value = ""; 
             });
-            // -------------------------------------------
         }
     } catch (err) {
         console.error('讀取失敗:', err);
         showToast('無法連線雲端');
     }
-    loadDraft(date); // 嘗試載入這天的未儲存草稿
+
+    // 7. 嘗試載入未儲存的本地草稿 (如果雲端是空的)
+    loadDraft(date); 
+    
+    // 8. 最後務必重新計算所有進度條
     setTimeout(() => calcAll(), 100); 
 }
 
@@ -383,7 +423,8 @@ async function onDateChange() {
 // 1. 定義哪些欄位需要自動暫存 (排除日期，因為日期改變應載入對應紀錄)
 const AUTO_SAVE_FIELDS = [
     'r-steps', 'r-water', 'is-exercise', 'r-stress', 
-    'r-fatigue', 'r-poop', 'r-edema', 'r-fullness', 'r-evil'
+    'r-fatigue', 'r-poop', 'r-edema', 'r-fullness', 'r-evil',
+    'r-sleep-score', 'r-sleep-start', 'r-sleep-end'
 ];
 
 // 2. 監聽輸入事件：當使用者打字或改選單時，立刻存入 localStorage
@@ -393,6 +434,31 @@ document.addEventListener('input', (e) => {
         saveCurrentStateToDraft(draftKey);
     }
 });
+
+function calcSleepTime() {
+    const start = document.getElementById('r-sleep-start').value;
+    const end = document.getElementById('r-sleep-end').value;
+    const hint = document.getElementById('sleep-duration-hint');
+    const txt = document.getElementById('sleep-total-txt');
+
+    if (!start || !end) { hint.style.display = 'none'; return; }
+
+    let [sh, sm] = start.split(':').map(Number);
+    let [eh, em] = end.split(':').map(Number);
+
+    let startTotal = sh * 60 + sm;
+    let endTotal = eh * 60 + em;
+    
+    // 如果醒來時間小於入睡時間，代表睡過夜
+    if (endTotal <= startTotal) endTotal += 24 * 60;
+
+    const diff = endTotal - startTotal;
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+
+    hint.style.display = 'block';
+    txt.textContent = `${h} 小時 ${m} 分鐘`;
+}
 
 // 將當前畫面所有數值打包存成草稿
 function saveCurrentStateToDraft(key) {
@@ -406,7 +472,10 @@ function saveCurrentStateToDraft(key) {
         poop: document.getElementById('r-poop').value,
         edema: document.getElementById('r-edema').value,
         fullness: document.getElementById('r-fullness').value,
-        // 餐點部分比較複雜，可以先暫存基本欄位，確保不丟失大項
+        // 修正這裡：對應新的睡眠欄位
+        sleepScore: document.getElementById('r-sleep-score').value,
+        sleepStart: document.getElementById('r-sleep-start').value,
+        sleepEnd: document.getElementById('r-sleep-end').value
     };
     localStorage.setItem(key, JSON.stringify(draftData));
 }
@@ -416,20 +485,25 @@ function loadDraft(date) {
     const draftData = JSON.parse(localStorage.getItem(`draft_${date}`));
     if (!draftData) return;
 
-    // 如果目前欄位是空的，才把暫存填回去 (避免覆蓋掉雲端已存好的資料)
     if (!document.getElementById('r-water').value) document.getElementById('r-water').value = draftData.water || "";
     if (!document.getElementById('r-steps').value) document.getElementById('r-steps').value = draftData.steps || "";
     document.getElementById('is-exercise').value = draftData.isExercise || "否";
     document.getElementById('r-evil').value = draftData.evil || "否";
-    
+
+    // 修正這裡：載入新的睡眠草稿
+    if (!document.getElementById('r-sleep-score').value) document.getElementById('r-sleep-score').value = draftData.sleepScore || "";
+    if (!document.getElementById('r-sleep-start').value) document.getElementById('r-sleep-start').value = draftData.sleepStart || "";
+    if (!document.getElementById('r-sleep-end').value) document.getElementById('r-sleep-end').value = draftData.sleepEnd || "";
+    calcSleepTime(); // 載入草稿後也要計算一次時數
+
     const bodyFields = ['stress', 'fatigue', 'poop', 'edema', 'fullness'];
     bodyFields.forEach(f => {
         const el = document.getElementById('r-' + f);
         if (el && !el.value) el.value = draftData[f] || "";
     });
     
-    toggleExercise(); // 確保運動區塊顯示狀態正確
-    calcAll();       // 重新計算進度條
+    toggleExercise();
+    calcAll();
 }
 
 function addMeal(d = null) {
@@ -560,7 +634,10 @@ async function saveRecord() {
             fatigue: document.getElementById('r-fatigue').value,
             poop: document.getElementById('r-poop').value,
             edema: document.getElementById('r-edema').value,
-            fullness: document.getElementById('r-fullness').value
+            fullness: document.getElementById('r-fullness').value,
+            sleepScore: document.getElementById('r-sleep-score').value,
+            sleepStart: document.getElementById('r-sleep-start').value,
+            sleepEnd: document.getElementById('r-sleep-end').value,
         };
 
         // 3. 傳送到後端 save 路由
@@ -599,7 +676,6 @@ function exportData() {
     const tp = parseFloat(document.getElementById('val-prot').textContent) || 0;
     const tv = parseFloat(document.getElementById('val-veg').textContent) || 0;
 
-    // 判斷樣式 (如果低於目標，標題加⚠️，數字變紅)
     const carbTitle = tc < 3 ? "總主食⚠️" : "總主食";
     const carbColor = tc < 3 ? "var(--red)" : "var(--accent)";
     
@@ -609,7 +685,7 @@ function exportData() {
     const vegTitle = tv < 4 ? "總蔬菜⚠️" : "總蔬菜";
     const vegColor = tv < 4 ? "var(--red)" : "var(--water)";
 
-    // 2. 準備飲食明細 HTML (維持原樣)
+    // 2. 準備飲食明細 HTML
     let mealsHtml = '';
     meals.forEach(id => {
         const type = document.getElementById(`mtype-${id}`).value;
@@ -636,7 +712,13 @@ function exportData() {
         `;
     });
 
-    // 3. 準備運動明細 (放在最後)
+    // 3. 準備睡眠與身體狀況數據
+    const sStart = document.getElementById('r-sleep-start').value || "--:--";
+    const sEnd = document.getElementById('r-sleep-end').value || "--:--";
+    const sScore = document.getElementById('r-sleep-score').value || 0;
+    const sDuration = document.getElementById('sleep-total-txt').textContent;
+
+    // 4. 準備運動明細
     const isExercise = document.getElementById('is-exercise').value;
     let exerHtml = '';
     if (isExercise === '是') {
@@ -650,59 +732,61 @@ function exportData() {
         });
         exerHtml = `
             <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #3a7c5e; padding-left:8px; margin-top:15px;">💪 運動紀錄</div>
-            <div style="background:#eaf2ee; border-radius:10px; padding:12px; margin-bottom:15px; border:1px solid #d1e2d9; color:#3a7c5e;">
+            <div style="background:#eaf2ee; border-radius:10px; padding:12px; border:1px solid #d1e2d9; color:#3a7c5e; margin-bottom:15px;">
                 ${exerItems || '有運動（未填寫項目）'}
             </div>
         `;
     }
 
-    // 4. 生活數據計算
+    // 5. 生活數據計算
     const waterVal = document.getElementById('r-water').value || 0;
     const waterPer = Math.min((waterVal / 2415) * 100, 100).toFixed(0);
     const stepVal  = document.getElementById('r-steps').value || 0;
     const stepPer  = Math.min((stepVal / 6000) * 100, 100).toFixed(0);
 
+    // 6. 組裝內容
     element.innerHTML = `
       <div style="padding:5px;">
         <div style="text-align:center; margin-bottom:15px;">
-          <h2 style="color:#c4773a; margin:0; font-size:20px;">自檢表</h2>
+          <h2 style="color:#c4773a; margin:0; font-size:20px;">健康自檢報表</h2>
           <div style="margin-top:4px; color:#6b6560; font-size:13px;">${date}</div>
         </div>
 
         <div style="background:#fffcf5; border:1px solid #f0e6d2; border-radius:12px; padding:12px; margin-bottom:15px; display:flex; justify-content:space-around; text-align:center;">
-          <div>
-            <small style="color:#6b6560; font-weight:bold;">${carbTitle}</small><br>
-            <b style="font-size:16px; color:${carbColor};">${tc}</b><br>
-            <small style="color:#999; font-size:10px;">(3)</small>
-          </div>
-          <div>
-            <small style="color:#6b6560; font-weight:bold;">${protTitle}</small><br>
-            <b style="font-size:16px; color:${protColor};">${tp}</b><br>
-            <small style="color:#999; font-size:10px;">(3)</small>
-          </div>
-          <div>
-            <small style="color:#6b6560; font-weight:bold;">${vegTitle}</small><br>
-            <b style="font-size:16px; color:${vegColor};">${tv}</b><br>
-            <small style="color:#999; font-size:10px;">(4)</small>
-          </div>
+          <div><small style="color:#6b6560; font-weight:bold;">${carbTitle}</small><br><b style="font-size:16px; color:${carbColor};">${tc}</b><br><small style="color:#999; font-size:10px;">(3)</small></div>
+          <div><small style="color:#6b6560; font-weight:bold;">${protTitle}</small><br><b style="font-size:16px; color:${protColor};">${tp}</b><br><small style="color:#999; font-size:10px;">(3)</small></div>
+          <div><small style="color:#6b6560; font-weight:bold;">${vegTitle}</small><br><b style="font-size:16px; color:${vegColor};">${tv}</b><br><small style="color:#999; font-size:10px;">(4)</small></div>
         </div>
 
         <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c4773a; padding-left:8px;">🥗 飲食紀錄</div>
         ${mealsHtml}
 
-        <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #6b6560; padding-left:8px; margin-top:15px;">🧠 身體狀況</div>
+        <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #6b6560; padding-left:8px; margin-top:15px;">🧠 身體與睡眠</div>
         <div style="background:#f0ede8; padding:12px; border-radius:10px; font-size:12px; margin-bottom:15px;">
-          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; text-align:center;">
-            <div>壓力: <b>${document.getElementById('r-stress').value || 0}</b></div>
-            <div>疲勞: <b>${document.getElementById('r-fatigue').value || 0}</b></div>
-            <div>便便: <b>${document.getElementById('r-poop').value || 0}</b></div>
-            <div>水腫: <b>${document.getElementById('r-edema').value || 0}</b></div>
-            <div>飽足: <b>${document.getElementById('r-fullness').value || 0}</b></div>
-            <div style="color:#c44040;">邪惡: <b>${document.getElementById('r-evil').value}</b></div>
-          </div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; text-align:center; margin-bottom:12px;">
+                <div>壓力(10): <b>${document.getElementById('r-stress').value || 0}</b></div>
+                <div>疲勞(10): <b>${document.getElementById('r-fatigue').value || 0}</b></div>
+                <div>便便(10): <b>${document.getElementById('r-poop').value || 0}</b></div>
+                <div>水腫(10): <b>${document.getElementById('r-edema').value || 0}</b></div>
+                <div>飽足(10): <b>${document.getElementById('r-fullness').value || 0}</b></div>
+                <div style="color:#c44040;">邪惡: <b>${document.getElementById('r-evil').value}</b></div>
+            </div>
+            
+            <div style="border-top:1px solid #dcd9d4; padding-top:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="text-align:left;">
+                        <span style="font-weight:bold; color:#6b6560;">睡眠(10)</span><br>
+                        <span style="font-size:11px; color:var(--text2);">${sStart} ~ ${sEnd}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:16px; color:var(--green); font-weight:800;">評分: ${sScore}</span><br>
+                        <span style="font-size:11px; color:var(--accent); font-weight:bold;">共 ${sDuration}</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:5px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
             <div style="background:#f0f7ff; padding:8px; border-radius:10px; border:1px solid #d0e3f7;">
                 <div style="color:#4a90e2; font-size:11px; font-weight:bold;">💧 水量 ${waterVal}ml</div>
                 <div style="background:#e2ddd6; height:6px; border-radius:3px; margin-top:5px;"><div style="width:${waterPer}%; background:#4a90e2; height:100%; border-radius:3px;"></div></div>
