@@ -181,8 +181,8 @@ input, select {
     </div>
 
     <div style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;">
-        <div style="display: flex; align-items: flex-end; gap: 8px;">
-            <div style="width: 75px;">
+        <div style="display: flex; align-items: flex-end; gap: 5px;">
+            <div style="width: 65px;">
                 <label class="lbl">睡眠</label>
                 <div class="combo-wrap">
                     <input type="number" id="r-sleep-score" placeholder="0">
@@ -191,18 +191,17 @@ input, select {
                     </select>
                 </div>
             </div>
-            <div style="flex: 1;">
+            <div style="width: 105px;">
                 <label class="lbl">入睡時間</label>
-                <input type="time" id="r-sleep-start" onchange="calcSleepTime()" style="padding: 4px;">
+                <input type="time" id="r-sleep-start" onchange="calcSleepTime()" style="padding: 4px; font-size: 13px;">
             </div>
-            <div style="flex: 1;">
+            <div style="width: 105px;">
                 <label class="lbl">醒來時間</label>
-                <input type="time" id="r-sleep-end" onchange="calcSleepTime()" style="padding: 4px;">
+                <input type="time" id="r-sleep-end" onchange="calcSleepTime()" style="padding: 4px; font-size: 13px;">
             </div>
         </div>
-        
-        <div id="sleep-duration-hint" style="font-size: 11px; color: var(--accent); margin-top: 8px; font-weight: 500; text-align: right; display: none;">
-            💤 約睡了 <span id="sleep-total-txt">0 小時 0 分</span>
+        <div id="sleep-duration-hint" style="font-size: 11px; color: var(--accent); margin-top: 5px; text-align: right; display: none;">
+            💤 <span id="sleep-total-txt">0 小時 0 分</span>
         </div>
     </div>
 </div>
@@ -685,6 +684,8 @@ function exportData() {
     const vegTitle = tv < 4 ? "總蔬菜⚠️" : "總蔬菜";
     const vegColor = tv < 4 ? "var(--red)" : "var(--water)";
 
+    const evilVal = document.getElementById('r-evil').value;
+    const evilColor = (evilVal === '是') ? '#c44040' : 'var(--text)';
     // 2. 準備飲食明細 HTML
     let mealsHtml = '';
     meals.forEach(id => {
@@ -763,24 +764,23 @@ function exportData() {
 
         <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #6b6560; padding-left:8px; margin-top:15px;">🧠 身體與睡眠</div>
         <div style="background:#f0ede8; padding:12px; border-radius:10px; font-size:12px; margin-bottom:15px;">
-            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; text-align:center; margin-bottom:12px;">
-                <div>壓力(10): <b>${document.getElementById('r-stress').value || 0}</b></div>
-                <div>疲勞(10): <b>${document.getElementById('r-fatigue').value || 0}</b></div>
-                <div>便便(10): <b>${document.getElementById('r-poop').value || 0}</b></div>
-                <div>水腫(10): <b>${document.getElementById('r-edema').value || 0}</b></div>
-                <div>飽足(10): <b>${document.getElementById('r-fullness').value || 0}</b></div>
-                <div style="color:#c44040;">邪惡: <b>${document.getElementById('r-evil').value}</b></div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; text-align:left; margin-bottom:10px;">
+                <div style="white-space:nowrap;">壓力: <b>${document.getElementById('r-stress').value || 0}</b></div>
+                <div style="white-space:nowrap;">疲勞: <b>${document.getElementById('r-fatigue').value || 0}</b></div>
+                <div style="white-space:nowrap;">便便: <b>${document.getElementById('r-poop').value || 0}</b></div>
+                <div style="white-space:nowrap;">水腫: <b>${document.getElementById('r-edema').value || 0}</b></div>
+                <div style="white-space:nowrap;">飽足: <b>${document.getElementById('r-fullness').value || 0}</b></div>
+                <div style="white-space:nowrap; color:${evilColor};">邪惡: <b>${evilVal}</b></div>
             </div>
             
-            <div style="border-top:1px solid #dcd9d4; padding-top:10px;">
+            <div style="border-top:1px solid #dcd9d4; padding-top:10px; margin-top:5px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div style="text-align:left;">
-                        <span style="font-weight:bold; color:#6b6560;">睡眠(10)</span><br>
-                        <span style="font-size:11px; color:var(--text2);">${sStart} ~ ${sEnd}</span>
+                        <span style="font-weight:normal; color:var(--text);">睡眠: <b>${sScore}</b></span>
+                        <span style="color:var(--text2); margin-left:12px; font-size:11px;">${sStart} ~ ${sEnd}</span>
                     </div>
-                    <div style="text-align:right;">
-                        <span style="font-size:16px; color:var(--green); font-weight:800;">評分: ${sScore}</span><br>
-                        <span style="font-size:11px; color:var(--accent); font-weight:bold;">共 ${sDuration}</span>
+                    <div style="color:var(--accent); font-weight:bold; font-size:11px;">
+                        (${sDuration})
                     </div>
                 </div>
             </div>
