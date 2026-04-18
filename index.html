@@ -539,7 +539,22 @@ function exportData() {
     const element = document.createElement('div');
     element.style.cssText = 'width:375px; background:#f7f5f2; padding:15px; font-family:Arial,sans-serif; position:absolute; top:0; left:-9999px;';
 
-    // 2. 準備飲食明細 HTML
+    // --- 份量判斷與顏色邏輯 ---
+    const tc = parseFloat(document.getElementById('val-carb').textContent) || 0;
+    const tp = parseFloat(document.getElementById('val-prot').textContent) || 0;
+    const tv = parseFloat(document.getElementById('val-veg').textContent) || 0;
+
+    // 判斷樣式 (如果低於目標，標題加⚠️，數字變紅)
+    const carbTitle = tc < 3 ? "總主食⚠️" : "總主食";
+    const carbColor = tc < 3 ? "var(--red)" : "var(--accent)";
+    
+    const protTitle = tp < 3 ? "總蛋白⚠️" : "總蛋白";
+    const protColor = tp < 3 ? "var(--red)" : "var(--green)";
+    
+    const vegTitle = tv < 4 ? "總蔬菜⚠️" : "總蔬菜";
+    const vegColor = tv < 4 ? "var(--red)" : "var(--water)";
+
+    // 2. 準備飲食明細 HTML (維持原樣)
     let mealsHtml = '';
     meals.forEach(id => {
         const type = document.getElementById(`mtype-${id}`).value;
@@ -548,7 +563,7 @@ function exportData() {
         const veg = document.getElementById(`mveg-${id}`).value || 0;
         const note = document.getElementById(`mnote-${id}`).value;
         const img = document.getElementById(`img-${id}`).src;
-        const hasImg = img && img.startsWith('http'); 
+        const hasImg = img && (img.startsWith('http') || img.startsWith('data:image')); 
 
         mealsHtml += `
             <div style="background:#fff; border-radius:10px; padding:12px; margin-bottom:12px; border:1px solid #e2ddd6;">
@@ -580,7 +595,7 @@ function exportData() {
         });
         exerHtml = `
             <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #3a7c5e; padding-left:8px; margin-top:15px;">💪 運動紀錄</div>
-            <div style="background:#eaf2ee; border-radius:10px; padding:12px; border:1px solid #d1e2d9; color:#3a7c5e;">
+            <div style="background:#eaf2ee; border-radius:10px; padding:12px; margin-bottom:15px; border:1px solid #d1e2d9; color:#3a7c5e;">
                 ${exerItems || '有運動（未填寫項目）'}
             </div>
         `;
@@ -600,9 +615,21 @@ function exportData() {
         </div>
 
         <div style="background:#fffcf5; border:1px solid #f0e6d2; border-radius:12px; padding:12px; margin-bottom:15px; display:flex; justify-content:space-around; text-align:center;">
-          <div><small style="color:#6b6560;">主食</small><br><b style="font-size:16px; color:#c4773a;">${document.getElementById('val-carb').textContent}</b></div>
-          <div><small style="color:#6b6560;">蛋白</small><br><b style="font-size:16px; color:#3a7c5e;">${document.getElementById('val-prot').textContent}</b></div>
-          <div><small style="color:#6b6560;">蔬菜</small><br><b style="font-size:16px; color:#4a90e2;">${document.getElementById('val-veg').textContent}</b></div>
+          <div>
+            <small style="color:#6b6560; font-weight:bold;">${carbTitle}</small><br>
+            <b style="font-size:16px; color:${carbColor};">${tc}</b><br>
+            <small style="color:#999; font-size:10px;">(3)</small>
+          </div>
+          <div>
+            <small style="color:#6b6560; font-weight:bold;">${protTitle}</small><br>
+            <b style="font-size:16px; color:${protColor};">${tp}</b><br>
+            <small style="color:#999; font-size:10px;">(3)</small>
+          </div>
+          <div>
+            <small style="color:#6b6560; font-weight:bold;">${vegTitle}</small><br>
+            <b style="font-size:16px; color:${vegColor};">${tv}</b><br>
+            <small style="color:#999; font-size:10px;">(4)</small>
+          </div>
         </div>
 
         <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c4773a; padding-left:8px;">🥗 飲食紀錄</div>
