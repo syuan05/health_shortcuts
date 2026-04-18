@@ -4,10 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>《自檢表》數位管理工具</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="自檢表">
+
+<link rel="apple-touch-icon" href="你的圖示網址.png">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <style>
+body {
+    /* 防止在手機上長按文字彈出選擇框 */
+    -webkit-user-select: none;
+    user-select: none;
+    /* 增加觸摸滾動的流暢度 */
+    -webkit-overflow-scrolling: touch;
+    /* 讓背景延伸到狀態列（iOS 全螢幕優化） */
+    padding-top: env(safe-area-inset-top);
+}
+
+/* 確保輸入框還是可以點選 */
+input, select, textarea {
+    -webkit-user-select: text;
+    user-select: text;
+}
 
 :root { --bg: #f7f5f2; --surface: #ffffff; --surface2: #f0ede8; --border: #e2ddd6; --text: #1a1714; --text2: #6b6560; --accent: #c4773a; --radius: 14px; --red: #c44040; --green: #3a7c5e; --water: #4a90e2; }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
