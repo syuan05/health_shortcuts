@@ -342,23 +342,78 @@ async function onDateChange() {
     // 最後務必重新計算進度條
     setTimeout(() => calcAll(), 100); 
 }
+function addMeal(d = null) {
+    const id = ++mealIdCtr;
+    meals.push(id);
+    const div = document.createElement('div');
+    div.className = 'item-block';
 
-function addMeal(d=null){
-    const id=++mealIdCtr; meals.push(id); const div=document.createElement('div'); div.className='item-block';
-    div.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:10px"><select id="mtype-${id}" style="width:auto;border:none;background:none;font-weight:bold">${mealTypes.map(t=>`<option ${d?.type===t?'selected':''}>${t}</option>`).join('')}</select><button onclick="this.parentElement.parentElement.remove();meals=meals.filter(x=>x!==${id});calcAll()" style="color:red;border:none;background:none;font-size:12px;cursor:pointer">移除</button></div>
-    <div class="row3"><div><label class="lbl">主食</label><input type="number" id="mcarb-${id}" value="${d?d.carb:''}" placeholder="0" oninput="calcAll()"></div><div><label class="lbl">蛋白</label><input type="number" id="mprot-${id}" value="${d?d.prot:''}" placeholder="0" oninput="calcAll()"></div><div><label class="lbl">蔬菜</label><input type="number" id="mveg-${id}" value="${d?d.veg:''}" placeholder="0" oninput="calcAll()"></div></div>
-    <input type="text" id="mnote-${id}" value="${d?.note||''}" placeholder="備註..." style="height:36px;margin-bottom:8px">
-    <button onclick="document.getElementById('file-${id}').click()" style="width:100%;padding:8px;font-size:12px;border:1px solid #ddd;background:#fff;border-radius:6px;cursor:pointer">📷 上傳照片</button>
-    <input type="file" id="file-${id}" accept="image/*" style="display:none" onchange="handleImage(${id}, this.files[0])">
-    <div class="img-preview" id="preview-${id}" style="${d?.img?'display:block':''}"><img src="${d?.img||''}" id="img-${id}"></div>`;
-    document.getElementById('meals-wrap').appendChild(div); calcAll();
+    // 修正點：確保反引號在 </div> 之後就關閉
+    div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+            <select id="mtype-${id}" style="width:auto;border:none;background:none;font-weight:bold">
+                ${mealTypes.map(t => `<option ${d?.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+            </select>
+            <button onclick="this.parentElement.parentElement.remove();meals=meals.filter(x=>x!==${id});calcAll()" style="color:red;border:none;background:none;font-size:12px;cursor:pointer">移除</button>
+        </div>
+        <div class="row3">
+            <div><label class="lbl">主食</label><input type="number" id="mcarb-${id}" value="${d ? d.carb : ''}" placeholder="0" oninput="calcAll()"></div>
+            <div><label class="lbl">蛋白</label><input type="number" id="mprot-${id}" value="${d ? d.prot : ''}" placeholder="0" oninput="calcAll()"></div>
+            <div><label class="lbl">蔬菜</label><input type="number" id="mveg-${id}" value="${d ? d.veg : ''}" placeholder="0" oninput="calcAll()"></div>
+        </div>
+        <input type="text" id="mnote-${id}" value="${d?.note || ''}" placeholder="備註..." style="height:36px;margin-bottom:8px">
+        <button onclick="document.getElementById('file-${id}').click()" style="width:100%;padding:8px;font-size:12px;border:1px solid #ddd;background:#fff;border-radius:6px;cursor:pointer">📷 上傳照片</button>
+        <input type="file" id="file-${id}" accept="image/*" style="display:none" onchange="handleImage(${id}, this.files[0])">
+        <div class="img-preview" id="preview-${id}" style="${d?.img ? 'display:block' : ''}">
+            <img src="${d?.img || ''}" id="img-${id}" onclick="reCrop(${id})" style="cursor:pointer; width:100%; height:100%; object-fit:cover;">
+        </div>
+    `; 
+
+    // 這一行必須在字串外面執行
+    document.getElementById('meals-wrap').appendChild(div);
+    calcAll();
 }
 
-function addExer(d=null){
-    const id=++exerIdCtr; exers.push(id); const div=document.createElement('div'); div.className='item-block';
-    div.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:5px"><label class="lbl">項目</label><button onclick="this.parentElement.parentElement.remove();exers=exers.filter(x=>x!==${id})" style="color:red;border:none;background:none;font-size:12px;cursor:pointer">移除</button></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><input type="text" id="ename-${id}" value="${d?.name||''}" placeholder="名稱"><input type="text" id="estr-${id}" value="${d?.str||''}" placeholder="內容"></div>`;
+function addExer(d = null) {
+    const id = ++exerIdCtr;
+    exers.push(id);
+    const div = document.createElement('div');
+    div.className = 'item-block';
+    div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+            <label class="lbl">項目</label>
+            <button onclick="this.parentElement.parentElement.remove();exers=exers.filter(x=>x!==${id})" style="color:red;border:none;background:none;font-size:12px;cursor:pointer">移除</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <input type="text" id="ename-${id}" value="${d?.name || ''}" placeholder="名稱">
+            <input type="text" id="estr-${id}" value="${d?.str || ''}" placeholder="內容">
+        </div>
+    `;
     document.getElementById('exer-wrap').appendChild(div);
+}
+
+function reCrop(id) {
+    const imgEl = document.getElementById(`img-${id}`);
+    if (!imgEl.src || imgEl.src === window.location.href) return;
+
+    currentMealId = id; // 記錄當前操作的餐點 ID
+    const cropModal = document.getElementById('crop-modal');
+    const cropImg = document.getElementById('crop-image');
+    
+    // 將現有照片的 src 放入裁切視窗
+    cropImg.src = imgEl.src;
+    cropModal.style.display = 'flex';
+
+    if (cropper) cropper.destroy();
+
+    // 啟動裁切器
+    cropper = new Cropper(cropImg, {
+        aspectRatio: 4 / 3,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 1,
+        checkOrientation: false // 避免某些雲端圖片轉向問題
+    });
 }
 
 async function saveRecord() {
