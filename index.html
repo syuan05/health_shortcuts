@@ -5,11 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>《自檢表》數位管理工具</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <style>
+
 :root { --bg: #f7f5f2; --surface: #ffffff; --surface2: #f0ede8; --border: #e2ddd6; --text: #1a1714; --text2: #6b6560; --accent: #c4773a; --radius: 14px; --red: #c44040; --green: #3a7c5e; --water: #4a90e2; }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 120px; }
 .app { max-width: 480px; margin: 0 auto; position: relative; }
+
 
 /* 核心修復：確保卡片不會互相覆蓋 */
 .card { 
@@ -70,8 +74,22 @@ input, select {
 .btn-add { width: 100%; padding: 12px; background: #fff; border: 1px dashed var(--accent); color: var(--accent); border-radius: 8px; cursor: pointer; margin-top: 5px; font-weight: 500; position: relative; z-index: 5; }
 .btn-save { width: calc(100% - 24px); margin: 20px 12px; padding: 16px; background: var(--accent); color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; position: relative; z-index: 5; }
 
-.img-preview { width: 100%; margin-top: 10px; border-radius: 8px; display: none; overflow: hidden; border: 1px solid #ddd; }
-.img-preview img { width: 100%; display: block; }
+.img-preview { 
+    width: 100%; 
+    aspect-ratio: 4 / 3; /* 強制預覽框也是 4:3 */
+    margin-top: 10px; 
+    border-radius: 8px; 
+    display: none; 
+    overflow: hidden; 
+    border: 1px solid #ddd; 
+    background: #f0f0f0;
+}
+.img-preview img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; /* 確保圖片填滿且不變形 */
+    display: block; 
+}
 .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; opacity: 0; z-index: 9999; pointer-events: none; transition: 0.3s; }
 .toast.show { opacity: 1; }
 .admin-btns { display: flex; gap: 8px; padding: 0 12px; margin-bottom: 40px; position: relative; z-index: 5; }
@@ -157,34 +175,55 @@ const BASE_URL = "https://health-shortcuts.onrender.com";
 let records=JSON.parse(localStorage.getItem('hj_records')||'[]'); 
 let meals=[], mealIdCtr=0, exers=[], exerIdCtr=0;
 
-async function handleImage(id, file) {
-    if (!file) return;
-    
-    // 這裡只做預覽與壓縮，不呼叫後端上傳
-    const compressedBase64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (e) => {
-            const img = new Image();
-            img.src = e.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800; 
-                const scale = MAX_WIDTH / img.width;
-                canvas.width = MAX_WIDTH;
-                canvas.height = img.height * scale;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/jpeg', 0.7)); 
-            };
-        };
-    });
+// --- 裁切功能全域變數 ---
+let cropper = null;
+let currentMealId = null;
 
-    const imgEl = document.getElementById(`img-${id}`);
-    imgEl.src = compressedBase64; // 此時 src 是 base64，僅供預覽
-    document.getElementById(`preview-${id}`).style.display = 'block';
+// 1. 覆蓋原本的 handleImage 函數
+function handleImage(id, file) {
+    if (!file) return;
+    currentMealId = id; // 記錄是哪一餐要換圖
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const cropModal = document.getElementById('crop-modal');
+        const cropImg = document.getElementById('crop-image');
+        cropImg.src = e.target.result;
+        cropModal.style.display = 'flex'; // 打開視窗
+
+        if (cropper) cropper.destroy();
+
+        // 啟動 Cropper.js
+        cropper = new Cropper(cropImg, {
+            aspectRatio: 4 / 3, // 固定 4:3 比例
+            viewMode: 1,
+            dragMode: 'move',
+            autoCropArea: 1
+        });
+    };
+    reader.readAsDataURL(file);
 }
 
+// 2. 新增：關閉裁切視窗的函數
+function closeCrop() {
+    document.getElementById('crop-modal').style.display = 'none';
+    if (cropper) cropper.destroy();
+}
+
+// 3. 新增：按下「確定裁切」的函數
+function confirmCrop() {
+    const canvas = cropper.getCroppedCanvas({
+        width: 800,  // 固定輸出寬度
+        height: 600  // 固定輸出高度 (4:3)
+    });
+    
+    const croppedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+    const imgEl = document.getElementById(`img-${currentMealId}`);
+    imgEl.src = croppedBase64; // 將裁切後的圖放回預覽框
+    
+    document.getElementById(`preview-${currentMealId}`).style.display = 'block';
+    closeCrop();
+    showToast('裁切完成');
+}
 function toggleExercise(){ document.getElementById('exercise-content').style.display=(document.getElementById('is-exercise').value==='是'?'block':'none'); if(exers.length===0 && document.getElementById('is-exercise').value==='是')addExer(); }
 
 function calcAll(){
@@ -595,5 +634,17 @@ window.onload = async () => {
     onDateChange(); 
 };
 </script>
+<div id="crop-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; flex-direction:column; align-items:center; justify-content:center;">
+    <div style="width:90%; max-width:400px; background:#fff; border-radius:14px; overflow:hidden;">
+        <div style="padding:15px; text-align:center; font-weight:bold; border-bottom:1px solid #eee;">裁切照片 (4:3)</div>
+        <div style="width:100%; height:300px; background:#000;">
+            <img id="crop-image" style="max-width:100%;">
+        </div>
+        <div style="display:flex; padding:10px; gap:10px;">
+            <button onclick="closeCrop()" style="flex:1; padding:12px; background:#eee; border:none; border-radius:8px;">取消</button>
+            <button onclick="confirmCrop()" style="flex:1; padding:12px; background:var(--accent); color:#fff; border:none; border-radius:8px;">確定裁切</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
