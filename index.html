@@ -405,81 +405,98 @@ function exportData() {
     if (!date) { alert("請選擇日期"); return; }
     showToast('圖片產生中...');
 
-    // 1. 建立一個不可見但存在的臨時容器 (優化渲染)
+    // 1. 建立一個不可見但存在的臨時容器
     const element = document.createElement('div');
-    element.style.cssText = 'width:375px; background:#f7f5f2; padding:20px; font-family:Arial,sans-serif; position:absolute; top:0; left:-9999px;';
+    element.style.cssText = 'width:375px; background:#f7f5f2; padding:15px; font-family:Arial,sans-serif; position:absolute; top:0; left:-9999px;';
 
-    // 2. 準備數據與視覺進度條 (直接嵌入卡片風格)
+    // 2. 獲取當前所有餐點的 HTML 內容
+    let mealsHtml = '';
+    meals.forEach(id => {
+        const type = document.getElementById(`mtype-${id}`).value;
+        const carb = document.getElementById(`mcarb-${id}`).value || 0;
+        const prot = document.getElementById(`mprot-${id}`).value || 0;
+        const veg = document.getElementById(`mveg-${id}`).value || 0;
+        const note = document.getElementById(`mnote-${id}`).value;
+        const img = document.getElementById(`img-${id}`).src;
+        const hasImg = img && !img.includes('placeholder') && img !== window.location.href;
+
+        mealsHtml += `
+            <div style="background:#fff; border-radius:10px; padding:12px; margin-bottom:12px; border:1px solid #e2ddd6;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="font-weight:bold; color:#c4773a;">🍴 ${type}</span>
+                    <span style="font-size:11px; color:#999;">C:${carb} / P:${prot} / V:${veg}</span>
+                </div>
+                ${hasImg ? `<img src="${img}" style="width:100%; border-radius:6px; margin-bottom:8px; display:block;">` : ''}
+                ${note ? `<div style="font-size:12px; color:#6b6560; background:#f9f9f9; padding:6px; border-radius:4px;">${note}</div>` : ''}
+            </div>
+        `;
+    });
+
+    // 3. 準備整體的報表範本
     const waterVal = document.getElementById('r-water').value || 0;
     const waterPer = Math.min((waterVal / 2415) * 100, 100).toFixed(0);
     const stepVal  = document.getElementById('r-steps').value || 0;
     const stepPer  = Math.min((stepVal / 6000) * 100, 100).toFixed(0);
 
     element.innerHTML = `
-      <div style="background:#fff; border-radius:15px; padding:20px; border:1px solid #e2ddd6;">
-        <div style="text-align:center; margin-bottom:20px;">
-          <h2 style="color:#c4773a; margin:0;">每日自檢健康報告</h2>
-          <div style="margin-top:5px; color:#6b6560; font-size:14px;">日期：${date}</div>
+      <div style="padding:5px;">
+        <div style="text-align:center; margin-bottom:15px;">
+          <h2 style="color:#c4773a; margin:0; font-size:20px;">健康自檢報告</h2>
+          <div style="margin-top:4px; color:#6b6560; font-size:13px;">${date}</div>
         </div>
 
-        <div style="margin-bottom:15px; background:#f0f7ff; padding:15px; border-radius:12px; border:1px solid #d0e3f7;">
-          <div style="color:#4a90e2; font-size:12px; font-weight:bold; margin-bottom:5px;">喝水量（目標 2415ml）</div>
-          <div style="font-size:20px; font-weight:bold;">${waterVal} ml</div>
-          <div style="background:#e2ddd6; height:8px; border-radius:4px; margin-top:8px;"><div style="width:${waterPer}%; background:#4a90e2; height:8px; border-radius:4px;"></div></div>
+        <div style="background:#fffcf5; border:1px solid #f0e6d2; border-radius:12px; padding:12px; margin-bottom:15px; display:flex; justify-content:space-around; text-align:center;">
+          <div><small style="color:#6b6560;">主食</small><br><b style="font-size:16px;">${document.getElementById('val-carb').textContent}</b></div>
+          <div><small style="color:#6b6560;">蛋白</small><br><b style="font-size:16px; color:#3a7c5e;">${document.getElementById('val-prot').textContent}</b></div>
+          <div><small style="color:#6b6560;">蔬菜</small><br><b style="font-size:16px;">${document.getElementById('val-veg').textContent}</b></div>
         </div>
 
-        <div style="margin-bottom:15px; background:#fff9f0; padding:15px; border-radius:12px; border:1px solid #f7e9d7;">
-          <div style="color:#c4773a; font-size:12px; font-weight:bold; margin-bottom:5px;">每日步數（目標 6000）</div>
-          <div style="font-size:20px; font-weight:bold;">${stepVal} 步</div>
-          <div style="background:#e2ddd6; height:8px; border-radius:4px; margin-top:8px;"><div style="width:${stepPer}%; background:#c4773a; height:8px; border-radius:4px;"></div></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+            <div style="background:#f0f7ff; padding:8px; border-radius:10px; border:1px solid #d0e3f7;">
+                <div style="color:#4a90e2; font-size:11px; font-weight:bold;">💧 水量 ${waterVal}ml</div>
+                <div style="background:#e2ddd6; height:6px; border-radius:3px; margin-top:5px;"><div style="width:${waterPer}%; background:#4a90e2; height:100%; border-radius:3px;"></div></div>
+            </div>
+            <div style="background:#fff9f0; padding:8px; border-radius:10px; border:1px solid #f7e9d7;">
+                <div style="color:#c4773a; font-size:11px; font-weight:bold;">🔥 步數 ${stepVal}</div>
+                <div style="background:#e2ddd6; height:6px; border-radius:3px; margin-top:5px;"><div style="width:${stepPer}%; background:#c4773a; height:100%; border-radius:3px;"></div></div>
+            </div>
         </div>
 
-        <div style="background:#fdfaf5; padding:15px; border-radius:12px; border:1px solid #e2ddd6; margin-bottom:15px;">
-          <div style="font-weight:bold; color:#c4773a; margin-bottom:10px;">🍎 飲食統計</div>
-          <div style="display:flex; justify-content:space-around; text-align:center;">
-            <div><small>主食</small><br><b>${document.getElementById('val-carb').textContent}</b></div>
-            <div><small>蛋白</small><br><b>${document.getElementById('val-prot').textContent}</b></div>
-            <div><small>蔬菜</small><br><b>${document.getElementById('val-veg').textContent}</b></div>
+        <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c4773a; padding-left:8px;">🥗 飲食明細</div>
+        ${mealsHtml}
+
+        <div style="background:#f0ede8; padding:12px; border-radius:10px; font-size:12px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+            <span>壓力: <b>${document.getElementById('r-stress').value || 0}</b></span>
+            <span>疲勞: <b>${document.getElementById('r-fatigue').value || 0}</b></span>
+            <span>便便: <b>${document.getElementById('r-poop').value || 0}</b></span>
           </div>
-        </div>
-
-        <div style="background:#f0ede8; padding:15px; border-radius:12px; margin-bottom:15px;">
-          <div style="font-weight:bold; color:#6b6560; margin-bottom:10px;">🧠 身體指標</div>
-          <div style="display:flex; justify-content:space-between; text-align:center; font-size:12px;">
-            <div>壓力<br><b>${document.getElementById('r-stress').value || 0}</b></div>
-            <div>疲勞<br><b>${document.getElementById('r-fatigue').value || 0}</b></div>
-            <div>便便<br><b>${document.getElementById('r-poop').value || 0}</b></div>
-            <div>水腫<br><b>${document.getElementById('r-edema').value || 0}</b></div>
-            <div>飽足<br><b>${document.getElementById('r-fullness').value || 0}</b></div>
-          </div>
-        </div>
-
-        <div style="background:#f9f9f9; padding:12px; border-radius:10px; border:1px solid #eee; font-size:13px;">
-          <div style="margin-bottom:5px;"><b>邪惡食物：</b>${document.getElementById('r-evil').value}</div>
-          <div><b>今日運動：</b>${document.getElementById('is-exercise').value === '是' ? '✅ 有運動' : '❌ 未運動'}</div>
+          <div style="color:#c44040;">邪惡食物：${document.getElementById('r-evil').value}</div>
         </div>
       </div>
     `;
 
     document.body.appendChild(element);
 
-    // 3. 呼叫 html2canvas
+    // 3. 呼叫 html2canvas 產生圖片
+    // 注意：為了跨網域顯示 Cloudinary 照片，useCORS 必須為 true
     html2canvas(element, {
-        scale: 2, // 提高解析度
+        scale: 2,
         backgroundColor: '#f7f5f2',
-        useCORS: true
+        useCORS: true,
+        allowTaint: false,
+        logging: false
     }).then(canvas => {
-        // 4. 下載圖片
         const link = document.createElement('a');
-        link.download = `自檢報告_${date}.jpg`;
+        link.download = `健康報表_${date}.jpg`;
         link.href = canvas.toDataURL('image/jpeg', 0.9);
         link.click();
         
         document.body.removeChild(element);
-        showToast('圖片已儲存至相簿');
+        showToast('匯出成功！');
     }).catch(err => {
         console.error(err);
-        alert('圖片產生失敗');
+        alert('圖片產生失敗，請確保照片已上傳成功');
         document.body.removeChild(element);
     });
 }
