@@ -681,7 +681,7 @@ async function clearAllData() {
     const date = document.getElementById('r-date').value;
     if (!date) return alert("請先選擇日期");
 
-    if (confirm(`⚠️ 確定要刪除雲端及本地端中 ${date} 的紀錄嗎？\n此動作無法復原！`)) {
+    if (confirm(`⚠️ 確定刪除 ${date}？`)) {
         showToast('正在刪除雲端資料...');
 
         try {
