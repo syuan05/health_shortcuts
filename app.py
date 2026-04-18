@@ -100,7 +100,28 @@ def get_record():
         if conn:
             conn.close()
 
-
+@app.route('/delete', methods=['POST'])
+def delete_record():
+    """ 依據日期刪除雲端紀錄 """
+    data = request.json
+    date = data.get('date')
+    if not date:
+        return jsonify({"status": "error", "message": "缺少日期參數"}), 400
+    
+    conn = None
+    try:
+        conn = pymysql.connect(**db_config)
+        with conn.cursor() as cursor:
+            # 執行刪除指令
+            sql = "DELETE FROM daily_records WHERE record_date = %s"
+            cursor.execute(sql, (date,))
+        conn.commit()
+        return jsonify({"status": "success", "message": f"日期 {date} 的雲端資料已刪除"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()    
 
 @app.route('/save', methods=['POST'])
 def save_data():
