@@ -409,7 +409,7 @@ function exportData() {
     const element = document.createElement('div');
     element.style.cssText = 'width:375px; background:#f7f5f2; padding:15px; font-family:Arial,sans-serif; position:absolute; top:0; left:-9999px;';
 
-    // 2. 準備飲食明細 HTML (強化顏色與中文標籤)
+    // 2. 準備飲食明細 HTML
     let mealsHtml = '';
     meals.forEach(id => {
         const type = document.getElementById(`mtype-${id}`).value;
@@ -436,7 +436,7 @@ function exportData() {
         `;
     });
 
-    // 3. 準備運動明細
+    // 3. 準備運動明細 (放在最後)
     const isExercise = document.getElementById('is-exercise').value;
     let exerHtml = '';
     if (isExercise === '是') {
@@ -449,14 +449,14 @@ function exportData() {
             }
         });
         exerHtml = `
-            <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #3a7c5e; padding-left:8px;">💪 運動紀錄</div>
-            <div style="background:#eaf2ee; border-radius:10px; padding:12px; margin-bottom:15px; border:1px solid #d1e2d9; color:#3a7c5e;">
+            <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #3a7c5e; padding-left:8px; margin-top:15px;">💪 運動紀錄</div>
+            <div style="background:#eaf2ee; border-radius:10px; padding:12px; border:1px solid #d1e2d9; color:#3a7c5e;">
                 ${exerItems || '有運動（未填寫項目）'}
             </div>
         `;
     }
 
-    // 4. 整體佈局補齊五項指標
+    // 4. 生活數據計算
     const waterVal = document.getElementById('r-water').value || 0;
     const waterPer = Math.min((waterVal / 2415) * 100, 100).toFixed(0);
     const stepVal  = document.getElementById('r-steps').value || 0;
@@ -465,7 +465,7 @@ function exportData() {
     element.innerHTML = `
       <div style="padding:5px;">
         <div style="text-align:center; margin-bottom:15px;">
-          <h2 style="color:#c4773a; margin:0; font-size:20px;">健康自檢報告</h2>
+          <h2 style="color:#c4773a; margin:0; font-size:20px;">自檢表</h2>
           <div style="margin-top:4px; color:#6b6560; font-size:13px;">${date}</div>
         </div>
 
@@ -475,7 +475,22 @@ function exportData() {
           <div><small style="color:#6b6560;">蔬菜</small><br><b style="font-size:16px; color:#4a90e2;">${document.getElementById('val-veg').textContent}</b></div>
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+        <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c4773a; padding-left:8px;">🥗 飲食紀錄</div>
+        ${mealsHtml}
+
+        <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #6b6560; padding-left:8px; margin-top:15px;">🧠 身體狀況</div>
+        <div style="background:#f0ede8; padding:12px; border-radius:10px; font-size:12px; margin-bottom:15px;">
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; text-align:center;">
+            <div>壓力: <b>${document.getElementById('r-stress').value || 0}</b></div>
+            <div>疲勞: <b>${document.getElementById('r-fatigue').value || 0}</b></div>
+            <div>便便: <b>${document.getElementById('r-poop').value || 0}</b></div>
+            <div>水腫: <b>${document.getElementById('r-edema').value || 0}</b></div>
+            <div>飽足: <b>${document.getElementById('r-fullness').value || 0}</b></div>
+            <div style="color:#c44040;">邪惡: <b>${document.getElementById('r-evil').value}</b></div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:5px;">
             <div style="background:#f0f7ff; padding:8px; border-radius:10px; border:1px solid #d0e3f7;">
                 <div style="color:#4a90e2; font-size:11px; font-weight:bold;">💧 水量 ${waterVal}ml</div>
                 <div style="background:#e2ddd6; height:6px; border-radius:3px; margin-top:5px;"><div style="width:${waterPer}%; background:#4a90e2; height:100%; border-radius:3px;"></div></div>
@@ -487,20 +502,6 @@ function exportData() {
         </div>
 
         ${exerHtml}
-
-        <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c4773a; padding-left:8px;">🥗 飲食明細</div>
-        ${mealsHtml}
-
-        <div style="background:#f0ede8; padding:12px; border-radius:10px; font-size:12px;">
-          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; text-align:center;">
-            <div>壓力: <b>${document.getElementById('r-stress').value || 0}</b></div>
-            <div>疲勞: <b>${document.getElementById('r-fatigue').value || 0}</b></div>
-            <div>便便: <b>${document.getElementById('r-poop').value || 0}</b></div>
-            <div>水腫: <b>${document.getElementById('r-edema').value || 0}</b></div>
-            <div>飽足: <b>${document.getElementById('r-fullness').value || 0}</b></div>
-            <div style="color:#c44040;">邪惡: <b>${document.getElementById('r-evil').value}</b></div>
-          </div>
-        </div>
       </div>
     `;
 
@@ -519,8 +520,6 @@ function exportData() {
         showToast('匯出成功！');
     });
 }
-
-
 function importData(){
     const input = document.createElement('input'); input.type = 'file'; input.accept = '.json';
     input.onchange = (e) => {
