@@ -168,7 +168,33 @@ input, select {
     </div>
     <div style="margin-top:15px"><label class="lbl">今日有運動？</label><select id="is-exercise" onchange="toggleExercise()"><option value="否">否</option><option value="是">是</option></select></div>
     <div id="exercise-content" style="display:none;margin-top:10px"><div id="exer-wrap"></div><button class="btn-add" onclick="addExer()">＋ 項目</button></div>
-    <div style="margin-top:15px"><label class="lbl">吃了邪惡食物？</label><select id="r-evil"><option>否</option><option>是</option></select></div>
+    <div style="margin-top:15px">
+        <label class="lbl">吃了邪惡食物？</label>
+        <select id="r-evil" onchange="toggleEvilContent()">
+            <option value="否">否</option>
+            <option value="是">是</option>
+        </select>
+    </div>
+    
+    <div id="evil-content" style="display:none; margin-top:12px; background:#fff5f5; border:1px solid #fbd5d5; padding:12px; border-radius:10px;">
+        <div style="font-size:11px; color:#c44040; font-weight:bold; margin-bottom:10px; border-bottom:1px dashed #fbd5d5; padding-bottom:6px;">
+            ⚠️ 每週放縱扣打上限 2 次（以下複選）
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <label style="display:flex; justify-content:space-between; align-items:center; font-size:14px; cursor:pointer;">
+                <span><input type="checkbox" id="chk-dessert" onchange="calcAll()" style="width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🍩 甜點</span>
+                <span id="quota-dessert-txt" style="font-size:12px; color:var(--text2);">剩餘 -- 次</span>
+            </label>
+            <label style="display:flex; justify-content:space-between; align-items:center; font-size:14px; cursor:pointer;">
+                <span><input type="checkbox" id="chk-drink" onchange="calcAll()" style="width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🧋 飲料</span>
+                <span id="quota-drink-txt" style="font-size:12px; color:var(--text2);">剩餘 -- 次</span>
+            </label>
+            <label style="display:flex; justify-content:space-between; align-items:center; font-size:14px; cursor:pointer;">
+                <span><input type="checkbox" id="chk-fried" onchange="calcAll()" style="style; width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🍗 炸物</span>
+                <span id="quota-fried-txt" style="font-size:12px; color:var(--text2);">剩餘 -- 次</span>
+            </label>
+        </div>
+    </div>
   </div>
 
   <div class="card">
@@ -273,8 +299,20 @@ function confirmCrop() {
     closeCrop();
     showToast('裁切完成');
 }
+
 function toggleExercise(){ document.getElementById('exercise-content').style.display=(document.getElementById('is-exercise').value==='是'?'block':'none'); if(exers.length===0 && document.getElementById('is-exercise').value==='是')addExer(); }
 
+function toggleEvilContent() {
+    const isEvil = document.getElementById('r-evil').value === '是';
+    document.getElementById('evil-content').style.display = isEvil ? 'block' : 'none';
+    if (!isEvil) {
+        // 如果選否，自動清空打勾
+        document.getElementById('chk-dessert').checked = false;
+        document.getElementById('chk-drink').checked = false;
+        document.getElementById('chk-fried').checked = false;
+        calcAll();
+    }
+}
 function calcAll(){
     // 1. 飲食計算
     let tc=0,tp=0,tv=0; 
@@ -316,6 +354,53 @@ function calcAll(){
         sBar.style.background = 'var(--accent)';
         sStatus.textContent = `還差 ${stepGoal - sVal} 步`;
         sStatus.style.color = 'var(--accent)';
+    }
+
+    // 4. 計算每週剩餘扣打 (動態撈取同週紀錄)
+    const currentDateStr = document.getElementById('r-date').value;
+    if (currentDateStr) {
+        const curDate = new Date(currentDateStr);
+        // 計算當週的週一與週日
+        const day = curDate.getDay();
+        const diffToMonday = curDate.getDate() - (day === 0 ? 6 : day - 1);
+        const monday = new Date(curDate.setDate(diffToMonday));
+        monday.setHours(0,0,0,0);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23,59,59,999);
+
+        // 初始本週已用計數 (排除今天在畫面上還沒儲存的，改以當前勾選狀態為準)
+        let used = { dessert: 0, drink: 0, fried: 0 };
+        
+        records.forEach(x => {
+            if (x.date !== currentDateStr) { // 排除當天舊資料
+                const xDate = new Date(x.date);
+                if (xDate >= monday && xDate <= sunday) {
+                    if (x.cheatDessert === "是") used.dessert++;
+                    if (x.cheatDrink === "是") used.drink++;
+                    if (x.cheatFried === "是") used.fried++;
+                }
+            }
+        });
+
+        // 加上今天目前在畫面上勾選的狀態
+        if (document.getElementById('chk-dessert').checked) used.dessert++;
+        if (document.getElementById('chk-drink').checked) used.drink++;
+        if (document.getElementById('chk-fried').checked) used.fried++;
+
+        // 更新介面文字顯示
+        const updateQuotaTxt = (id, usedCount) => {
+            const el = document.getElementById(id);
+            const remain = 2 - usedCount;
+            if (remain <= 0) {
+                el.innerHTML = `<span style="color:var(--red); font-weight:bold;">已吃滿 ❌</span>`;
+            } else {
+                el.innerHTML = `剩 <b style="color:var(--green)">${remain}</b> 次`;
+            }
+        };
+        updateQuotaTxt('quota-dessert-txt', used.dessert);
+        updateQuotaTxt('quota-drink-txt', used.drink);
+        updateQuotaTxt('quota-fried-txt', used.fried);
     }
 }
 
@@ -359,7 +444,11 @@ async function onDateChange() {
             document.getElementById('r-sleep-start').value = r.sleepStart || "";
             document.getElementById('r-sleep-end').value = r.sleepEnd || "";
             calcSleepTime(); // 載入後立刻計算總時數顯示
-
+            document.getElementById('r-evil').value = r.evil || '否';
+            document.getElementById('chk-dessert').checked = r.cheatDessert === "是";
+            document.getElementById('chk-drink').checked = r.cheatDrink === "是";
+            document.getElementById('chk-fried').checked = r.cheatFried === "是";
+            toggleEvilContent();
             // 3. 還原飲食紀錄
             if (r.meals && r.meals.length > 0) {
                 r.meals.forEach(m => addMeal(m));
@@ -396,6 +485,11 @@ async function onDateChange() {
             document.getElementById('r-sleep-end').value = "";
             document.getElementById('sleep-duration-hint').style.display = 'none';
 
+            document.getElementById('r-evil').value = '否';
+            document.getElementById('chk-dessert').checked = false;
+            document.getElementById('chk-drink').checked = false;
+            document.getElementById('chk-fried').checked = false;
+            toggleEvilContent();
             // 重置生活與身體指標
             document.getElementById('r-water').value = "";
             document.getElementById('r-steps').value = "";
@@ -424,7 +518,8 @@ async function onDateChange() {
 const AUTO_SAVE_FIELDS = [
     'r-steps', 'r-water', 'is-exercise', 'r-stress', 
     'r-fatigue', 'r-poop', 'r-edema', 'r-fullness', 'r-evil',
-    'r-sleep-score', 'r-sleep-start', 'r-sleep-end'
+    'r-sleep-score', 'r-sleep-start', 'r-sleep-end',
+    'cheat-dessert', 'cheat-drink', 'cheat-fried'
 ];
 
 // 2. 監聽輸入事件：當使用者打字或改選單時，立刻存入 localStorage
@@ -475,7 +570,10 @@ function saveCurrentStateToDraft(key) {
         // 修正這裡：對應新的睡眠欄位
         sleepScore: document.getElementById('r-sleep-score').value,
         sleepStart: document.getElementById('r-sleep-start').value,
-        sleepEnd: document.getElementById('r-sleep-end').value
+        sleepEnd: document.getElementById('r-sleep-end').value,
+        cheatDessert: document.getElementById('chk-dessert').checked ? "是" : "否",
+        cheatDrink: document.getElementById('chk-drink').checked ? "是" : "否",
+        cheatFried: document.getElementById('chk-fried').checked ? "是" : "否"
     };
     localStorage.setItem(key, JSON.stringify(draftData));
 }
@@ -490,11 +588,10 @@ function loadDraft(date) {
     document.getElementById('is-exercise').value = draftData.isExercise || "否";
     document.getElementById('r-evil').value = draftData.evil || "否";
 
-    // 修正這裡：載入新的睡眠草稿
     if (!document.getElementById('r-sleep-score').value) document.getElementById('r-sleep-score').value = draftData.sleepScore || "";
     if (!document.getElementById('r-sleep-start').value) document.getElementById('r-sleep-start').value = draftData.sleepStart || "";
     if (!document.getElementById('r-sleep-end').value) document.getElementById('r-sleep-end').value = draftData.sleepEnd || "";
-    calcSleepTime(); // 載入草稿後也要計算一次時數
+    calcSleepTime(); 
 
     const bodyFields = ['stress', 'fatigue', 'poop', 'edema', 'fullness'];
     bodyFields.forEach(f => {
@@ -502,6 +599,11 @@ function loadDraft(date) {
         if (el && !el.value) el.value = draftData[f] || "";
     });
     
+    // 補回並修正斷掉的這段
+    document.getElementById('chk-dessert').checked = draftData.cheatDessert === "是";
+    document.getElementById('chk-drink').checked = draftData.cheatDrink === "是";
+    document.getElementById('chk-fried').checked = draftData.cheatFried === "是"; // 修正原本寫錯的 "原"
+    toggleEvilContent();
     toggleExercise();
     calcAll();
 }
@@ -630,6 +732,9 @@ async function saveRecord() {
             water: document.getElementById('r-water').value,
             steps: document.getElementById('r-steps').value,
             evil: document.getElementById('r-evil').value,
+            cheatDessert: document.getElementById('chk-dessert').checked ? "是" : "否",
+            cheatDrink: document.getElementById('chk-drink').checked ? "是" : "否",
+            cheatFried: document.getElementById('chk-fried').checked ? "是" : "否",
             stress: document.getElementById('r-stress').value,
             fatigue: document.getElementById('r-fatigue').value,
             poop: document.getElementById('r-poop').value,
@@ -687,6 +792,30 @@ function exportData() {
 
     const evilVal = document.getElementById('r-evil').value;
     const evilColor = (evilVal === '是') ? '#c44040' : 'var(--text)';
+
+    // --- 邪惡食物放縱清單：在產生 HTML 前先計算完畢 ---
+    const isEv = evilVal === '是';
+    let evilChecklistHtml = '';
+    
+    if (isEv) {
+        const dIcon = document.getElementById('chk-dessert').checked ? "☑️ [已吃]" : "⬜ [未吃]";
+        const drIcon = document.getElementById('chk-drink').checked ? "☑️ [已吃]" : "⬜ [未吃]";
+        const fIcon = document.getElementById('chk-fried').checked ? "☑️ [已吃]" : "⬜ [未吃]";
+        
+        const dRem = document.getElementById('quota-dessert-txt').innerText;
+        const drRem = document.getElementById('quota-drink-txt').innerText;
+        const fRem = document.getElementById('quota-fried-txt').innerText;
+
+        evilChecklistHtml = `
+            <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c44040; padding-left:8px; margin-top:15px;">😈 邪惡食物放縱清單</div>
+            <div style="background:#fff5f5; border-radius:10px; padding:12px; border:1px solid #fbd5d5; color:#c44040; font-size:13px; margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${dIcon} 🍩 甜點</span> <span style="color:#6b6560; font-size:11px;">(${dRem})</span></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${drIcon} 🧋 飲料</span> <span style="color:#6b6560; font-size:11px;">(${drRem})</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>${fIcon} 🍗 炸物</span> <span style="color:#6b6560; font-size:11px;">(${fRem})</span></div>
+            </div>
+        `;
+    }
+
     // 2. 準備飲食明細 HTML
     let mealsHtml = '';
     meals.forEach(id => {
@@ -746,7 +875,7 @@ function exportData() {
     const stepVal  = document.getElementById('r-steps').value || 0;
     const stepPer  = Math.min((stepVal / 6000) * 100, 100).toFixed(0);
 
-    // 6. 組裝內容
+    // 6. 組裝內容 HTML 結構
     element.innerHTML = `
       <div style="padding:5px;">
         <div style="text-align:center; margin-bottom:15px;">
@@ -787,6 +916,8 @@ function exportData() {
             </div>
         </div>
 
+        ${evilChecklistHtml}
+
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
             <div style="background:#f0f7ff; padding:8px; border-radius:10px; border:1px solid #d0e3f7;">
                 <div style="color:#4a90e2; font-size:11px; font-weight:bold;">💧 水量 ${waterVal}ml</div>
@@ -804,6 +935,7 @@ function exportData() {
 
     document.body.appendChild(element);
 
+    // 7. 使用 html2canvas 繪製並下載圖片
     html2canvas(element, {
         scale: 2,
         backgroundColor: '#f7f5f2',
