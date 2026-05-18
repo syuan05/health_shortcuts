@@ -395,11 +395,12 @@ function calcAll(){
         // 更新介面文字顯示
         const updateQuotaTxt = (id, usedCount) => {
             const el = document.getElementById(id);
-            const remain = 2 - usedCount;
-            if (remain <= 0) {
-                el.innerHTML = `<span style="color:var(--red); font-weight:bold;">已吃滿 ❌</span>`;
+            if (usedCount >= 2) {
+                // 超過或達到 2 次顯示紅色警告
+                el.innerHTML = `<span style="color:var(--red); font-weight:bold;">${usedCount}/2 ⚠️</span>`;
             } else {
-                el.innerHTML = `剩 <b style="color:var(--green)">${remain}</b> 次`;
+                // 未滿 2 次顯示綠色安全字體
+                el.innerHTML = `<b style="color:var(--green)">${usedCount}/2</b>`;
             }
         };
         updateQuotaTxt('quota-dessert-txt', used.dessert);
@@ -807,10 +808,12 @@ function exportData() {
     let evilChecklistHtml = '';
     
     if (isEv) {
+        if (isEv) {
         const dIcon = document.getElementById('chk-dessert').checked ? "☑️ [已吃]" : "⬜ [未吃]";
         const drIcon = document.getElementById('chk-drink').checked ? "☑️ [已吃]" : "⬜ [未吃]";
         const fIcon = document.getElementById('chk-fried').checked ? "☑️ [已吃]" : "⬜ [未吃]";
         
+        // 🛠️ 直接抓取網頁上更新後的 X/2 文字（例如 1/2 或 3/2）
         const dRem = document.getElementById('quota-dessert-txt').innerText;
         const drRem = document.getElementById('quota-drink-txt').innerText;
         const fRem = document.getElementById('quota-fried-txt').innerText;
@@ -818,9 +821,9 @@ function exportData() {
         evilChecklistHtml = `
             <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c44040; padding-left:8px; margin-top:15px;">😈 邪惡食物放縱清單</div>
             <div style="background:#fff5f5; border-radius:10px; padding:12px; border:1px solid #fbd5d5; color:#c44040; font-size:13px; margin-bottom:15px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${dIcon} 🍩 甜點</span> <span style="color:#6b6560; font-size:11px;">(${dRem})</span></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${drIcon} 🧋 飲料</span> <span style="color:#6b6560; font-size:11px;">(${drRem})</span></div>
-                <div style="display:flex; justify-content:space-between;"><span>${fIcon} 🍗 炸物</span> <span style="color:#6b6560; font-size:11px;">(${fRem})</span></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${dIcon} 🍩 甜點</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${dRem}</span></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${drIcon} 🧋 飲料</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${drRem}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>${fIcon} 🍗 炸物</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${fRem}</span></div>
             </div>
         `;
     }
