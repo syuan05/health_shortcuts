@@ -395,12 +395,16 @@ function calcAll(){
         // 更新介面文字顯示
         const updateQuotaTxt = (id, usedCount) => {
             const el = document.getElementById(id);
-            if (usedCount >= 2) {
+            if (!el) return; // 👈 關鍵防呆：若此時卡片隱藏、標籤不存在，就直接跳出不執行
+
+            const count = usedCount || 0; // 確保數值安全
+            
+            if (count >= 2) {
                 // 超過或達到 2 次顯示紅色警告
-                el.innerHTML = `<span style="color:var(--red); font-weight:bold;">${usedCount}/2 ⚠️</span>`;
+                el.innerHTML = `<span style="color:var(--red); font-weight:bold;">${count}/2 ⚠️</span>`;
             } else {
                 // 未滿 2 次顯示綠色安全字體
-                el.innerHTML = `<b style="color:var(--green)">${usedCount}/2</b>`;
+                el.innerHTML = `<b style="color:var(--green)">${count}/2</b>`;
             }
         };
         updateQuotaTxt('quota-dessert-txt', used.dessert);
@@ -808,12 +812,10 @@ function exportData() {
     let evilChecklistHtml = '';
     
     if (isEv) {
-        if (isEv) {
         const dIcon = document.getElementById('chk-dessert').checked ? "☑️ [已吃]" : "⬜ [未吃]";
         const drIcon = document.getElementById('chk-drink').checked ? "☑️ [已吃]" : "⬜ [未吃]";
         const fIcon = document.getElementById('chk-fried').checked ? "☑️ [已吃]" : "⬜ [未吃]";
         
-        // 🛠️ 直接抓取網頁上更新後的 X/2 文字（例如 1/2 或 3/2）
         const dRem = document.getElementById('quota-dessert-txt').innerText;
         const drRem = document.getElementById('quota-drink-txt').innerText;
         const fRem = document.getElementById('quota-fried-txt').innerText;
@@ -947,7 +949,6 @@ function exportData() {
 
     document.body.appendChild(element);
 
-    // 7. 使用 html2canvas 繪製並下載圖片
     html2canvas(element, {
         scale: 2,
         backgroundColor: '#f7f5f2',
