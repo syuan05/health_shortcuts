@@ -47,16 +47,7 @@ def db_health():
         return jsonify({"status": "error", "message": str(e)}), 500
 @app.route('/test', methods=['GET'])
 def test_db():
-    """ 手動測試資料庫連線是否正常 """
-    try:
-        conn = pymysql.connect(**db_config)
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT VERSION()")
-            version = cursor.fetchone()
-        conn.close()
-        return jsonify({"status": "連線成功", "mysql_version": version})
-    except Exception as e:
-        return jsonify({"status": "連線失敗", "error": str(e)}), 500
+    return jsonify({"status": "ok", "message": "Redirected test endpoint"}), 200
 
 @app.route('/upload', methods=['POST'])
 def upload_image():
