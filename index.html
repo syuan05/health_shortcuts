@@ -91,6 +91,7 @@ input, select {
     background: #fff;
     position: relative;
     z-index: 2; /* 提高輸入框層級 */
+    min-width: 0;
 }
 ::placeholder { color: #ccc; opacity: 1; }
 
@@ -181,8 +182,8 @@ input, select {
     </div>
 
     <div style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;">
-        <div style="display: flex; align-items: flex-end; gap: 5px;">
-            <div style="width: 65px;">
+        <div style="display: flex; align-items: flex-end; gap: 8px; width: 100%;">
+            <div style="flex: 1;">
                 <label class="lbl">睡眠</label>
                 <div class="combo-wrap">
                     <input type="number" id="r-sleep-score" placeholder="0">
@@ -191,11 +192,11 @@ input, select {
                     </select>
                 </div>
             </div>
-            <div style="width: 105px;">
+            <div style="flex: 1.5;">
                 <label class="lbl">入睡時間</label>
                 <input type="time" id="r-sleep-start" onchange="calcSleepTime()" style="padding: 4px; font-size: 13px;">
             </div>
-            <div style="width: 105px;">
+            <div style="flex: 1.5;">
                 <label class="lbl">醒來時間</label>
                 <input type="time" id="r-sleep-end" onchange="calcSleepTime()" style="padding: 4px; font-size: 13px;">
             </div>

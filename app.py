@@ -45,6 +45,7 @@ def db_health():
         return jsonify({"status": "success", "message": "Database connected"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    
 @app.route('/test', methods=['GET'])
 def test_db():
     return jsonify({"status": "ok", "message": "Redirected test endpoint"}), 200
