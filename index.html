@@ -1123,55 +1123,69 @@ async function trySyncFromClipboard() {
     return false; // 失敗回傳 false 繼續重試
 }
 
-// 🔥 激進防禦版 window.onload 初始化
-// ⭕️ 改成這個激進安全版
+/// ✨ 封裝一個通用的「抓取網址參數並填入」函式
+function syncFromURLParams() {
+    console.log("現在的完整網址是:", window.location.href);
+    const urlParams = new URLSearchParams(window.location.search);
+    const steps = urlParams.get('steps');
+    
+    if (steps && !isNaN(steps) && parseFloat(steps) > 0) {
+        // 精準寫入輸入框
+        document.getElementById('r-steps').value = steps;
+        // 強迫網頁重新計算圖表
+        calcAll();
+        showToast(`🍎 步數數據同步成功：${steps} 步`);
+        
+        // 【關鍵】填入成功後，立刻把網址後面的 ?steps= 清空，防止下次手動打開又重複填入
+        const cleanURL = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanURL);
+        return true;
+    }
+    return false;
+}
+
 window.onload = async () => {
-    // 1. 先設定日期
+    // 1. 初始化日期
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('r-date').value = today;
     
-    // 2. 檢查連線狀態
+    // 2. 檢查連線與載入當天紀錄（這步會把欄位重置或還原雲端資料）
     await checkSystemStatus(); 
-    
-    // 3. 載入當天雲端或快取資料（這步會重置欄位）
     await onDateChange();                  
     
-    // 4. ✨【關鍵移位】所有人都重置完了，最後才從網址抓步數塞進去！
-    checkURLParamsForHealthData();
+    // 3. 網頁第一次載入時，嘗試抓取網址
+    syncFromURLParams();
     
-    // 額外保險：如果網址有抓到步數，順手寫入本地自動暫存草稿，防止被其他事件洗掉
-    const stepsParam = new URLSearchParams(window.location.search).get('steps');
-    if (stepsParam && !isNaN(stepsParam) && parseFloat(stepsParam) > 0) {
-        setTimeout(() => {
-            const draftKey = `draft_${document.getElementById('r-date').value}`;
-            if (typeof saveCurrentStateToDraft === 'function') {
-                saveCurrentStateToDraft(draftKey);
-            }
-        }, 100);
-    }
-    
-    // 5. 保留當 App 從背景亮起時的剪貼簿連環強抓保險
-    document.addEventListener('visibilitychange', async () => {
+    // 4. 🔥【終極修正】處理 iOS PWA 喚醒時的網址延遲 Bug
+    // 網頁亮起時，啟動一個每 200 毫秒執行一次的「連環奪命追魂 call」
+    // 只要 iOS 一把網址參數塞進來，網頁立刻攔截並填入，然後自動關閉定時器！
+    document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
+            console.log("PWA 醒來，啟動連環網址監測...");
             let attempts = 0;
-            const maxAttempts = 10;
-            const intervalId = setInterval(async () => {
+            const maxAttempts = 15; // 最多連抓 3 秒鐘 (15 * 200ms)
+            
+            const urlCheckInterval = setInterval(() => {
                 attempts++;
-                const isSuccess = await trySyncFromClipboard();
+                const isSuccess = syncFromURLParams();
+                
+                // 如果抓成功了，或者超過 3 秒都抓不到，就關閉定時器
                 if (isSuccess || attempts >= maxAttempts) {
-                    clearInterval(intervalId);
+                    clearInterval(urlCheckInterval);
+                    console.log(`網址監測結束，結果：${isSuccess ? '成功填入' : '未發現參數'}`);
                 }
-            }, 300);
+            }, 200);
         }
     });
 
-    // 6. 點擊螢幕強抓剪貼簿保險
-    document.addEventListener('click', async function autoSyncOnFirstClick() {
-        const success = await trySyncFromClipboard();
+    // 5. 🔥【最終保險】萬一被 iOS 嚴格阻擋，使用者回到 App 隨便點擊螢幕任何地方，立刻再次補抓！
+    document.addEventListener('click', function autoParamSyncOnClick() {
+        const success = syncFromURLParams();
         if (success) {
-            document.removeEventListener('click', autoSyncOnFirstClick);
+            // 成功填入後就拆掉監聽器，避免影響後續正常點擊
+            document.removeEventListener('click', autoParamSyncOnClick);
         }
-    }, { once: false });
+    });
 };
 
 
