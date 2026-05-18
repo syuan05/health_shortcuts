@@ -443,26 +443,15 @@ function syncFromAppleHealth() {
 }
 
 // 2. 檢查網址有沒有從捷徑帶回來的數據，有就自動填表
-async function checkURLParamsForHealthData() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const steps = urlParams.get('steps');
-    const sleepStart = urlParams.get('sleepStart');
-    const sleepEnd = urlParams.get('sleepEnd');
-    const paramDate = urlParams.get('date');
-
-    if (steps || sleepStart || sleepEnd) {
-        if (paramDate) {
-            document.getElementById('r-date').value = paramDate;
-            await onDateChange(); // ← 等舊資料載入完
-        }
-        // 舊資料載入完才填入捷徑資料（不會被蓋掉）
-        if (steps) document.getElementById('r-steps').value = steps;
-        if (sleepStart) document.getElementById('r-sleep-start').value = sleepStart;
-        if (sleepEnd) document.getElementById('r-sleep-end').value = sleepEnd;
-        if (sleepStart || sleepEnd) calcSleepTime();
-        
-        showToast("🍎 Apple Health 數據同步成功！");
-        window.history.replaceState({}, document.title, window.location.pathname);
+function checkURLParamsForHealthData() {
+    const params = new URLSearchParams(window.location.search);
+    const steps = params.get('steps');
+    if (steps && !isNaN(steps) && parseFloat(steps) > 0) {
+        document.getElementById('r-steps').value = steps;
+        calcAll();
+        showToast("🍎 步數同步成功！");
+        // 清掉網址裡的參數，避免重新整理又填一次
+        window.history.replaceState({}, '', window.location.pathname);
     }
 }
 
