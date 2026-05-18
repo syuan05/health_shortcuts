@@ -135,9 +135,9 @@ input, select {
     <div class="card">
     <div class="card-title">飲食進度</div>
     <div class="total-box">
-      <div class="total-item"><div class="lbl">主食(3)</div><div id="val-carb" class="total-val">0</div><div class="progress-bg"><div id="bar-carb" class="progress-bar" style="background:var(--accent)"></div></div></div>
-      <div class="total-item"><div class="lbl">蛋白(3)</div><div id="val-prot" class="total-val">0</div><div class="progress-bg"><div id="bar-prot" class="progress-bar" style="background:var(--green)"></div></div></div>
-      <div class="total-item"><div class="lbl">蔬菜(4)</div><div id="val-veg" class="total-val">0</div><div class="progress-bg"><div id="bar-veg" class="progress-bar" style="background:var(--accent)"></div></div></div>
+      <div class="total-item"><div class="lbl">主食(2)</div><div id="val-carb" class="total-val">0</div><div class="progress-bg"><div id="bar-carb" class="progress-bar" style="background:var(--accent)"></div></div></div>
+      <div class="total-item"><div class="lbl">蛋白(2)</div><div id="val-prot" class="total-val">0</div><div class="progress-bg"><div id="bar-prot" class="progress-bar" style="background:var(--green)"></div></div></div>
+      <div class="total-item"><div class="lbl">蔬菜(3)</div><div id="val-veg" class="total-val">0</div><div class="progress-bg"><div id="bar-veg" class="progress-bar" style="background:var(--accent)"></div></div></div>
     </div>
   </div>
 
@@ -218,7 +218,7 @@ input, select {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 const mealTypes=['早餐','午餐','晚餐','點心','宵夜']; 
-const goals={carb:3, prot:3, veg:4, water:2415};
+const goals={carb:2, prot:2, veg:3, water:2415};
 const BASE_URL = "https://health-shortcuts.onrender.com";
 let records=JSON.parse(localStorage.getItem('hj_records')||'[]'); 
 let meals=[], mealIdCtr=0, exers=[], exerIdCtr=0;
@@ -675,14 +675,14 @@ function exportData() {
     const tp = parseFloat(document.getElementById('val-prot').textContent) || 0;
     const tv = parseFloat(document.getElementById('val-veg').textContent) || 0;
 
-    const carbTitle = tc < 3 ? "總主食⚠️" : "總主食";
-    const carbColor = tc < 3 ? "var(--red)" : "var(--accent)";
+    const carbTitle = tc < 2 ? "總主食⚠️" : "總主食";
+    const carbColor = tc < 2 ? "var(--red)" : "var(--accent)";
     
-    const protTitle = tp < 3 ? "總蛋白⚠️" : "總蛋白";
-    const protColor = tp < 3 ? "var(--red)" : "var(--green)";
+    const protTitle = tp < 2 ? "總蛋白⚠️" : "總蛋白";
+    const protColor = tp < 2 ? "var(--red)" : "var(--green)";
     
-    const vegTitle = tv < 4 ? "總蔬菜⚠️" : "總蔬菜";
-    const vegColor = tv < 4 ? "var(--red)" : "var(--water)";
+    const vegTitle = tv < 3 ? "總蔬菜⚠️" : "總蔬菜";
+    const vegColor = tv < 3 ? "var(--red)" : "var(--water)";
 
     const evilVal = document.getElementById('r-evil').value;
     const evilColor = (evilVal === '是') ? '#c44040' : 'var(--text)';
@@ -754,9 +754,9 @@ function exportData() {
         </div>
 
         <div style="background:#fffcf5; border:1px solid #f0e6d2; border-radius:12px; padding:12px; margin-bottom:15px; display:flex; justify-content:space-around; text-align:center;">
-          <div><small style="color:#6b6560; font-weight:bold;">${carbTitle}</small><br><b style="font-size:16px; color:${carbColor};">${tc}</b><br><small style="color:#999; font-size:10px;">(3)</small></div>
-          <div><small style="color:#6b6560; font-weight:bold;">${protTitle}</small><br><b style="font-size:16px; color:${protColor};">${tp}</b><br><small style="color:#999; font-size:10px;">(3)</small></div>
-          <div><small style="color:#6b6560; font-weight:bold;">${vegTitle}</small><br><b style="font-size:16px; color:${vegColor};">${tv}</b><br><small style="color:#999; font-size:10px;">(4)</small></div>
+          <div><small style="color:#6b6560; font-weight:bold;">${carbTitle}</small><br><b style="font-size:16px; color:${carbColor};">${tc}</b><br><small style="color:#999; font-size:10px;">(2)</small></div>
+          <div><small style="color:#6b6560; font-weight:bold;">${protTitle}</small><br><b style="font-size:16px; color:${protColor};">${tp}</b><br><small style="color:#999; font-size:10px;">(2)</small></div>
+          <div><small style="color:#6b6560; font-weight:bold;">${vegTitle}</small><br><b style="font-size:16px; color:${vegColor};">${tv}</b><br><small style="color:#999; font-size:10px;">(3)</small></div>
         </div>
 
         <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c4773a; padding-left:8px;">🥗 飲食紀錄</div>
