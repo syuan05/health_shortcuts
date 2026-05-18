@@ -523,13 +523,7 @@ async function onDateChange() {
 
             // 5. 還原生活數據
             document.getElementById('r-water').value = r.water || "";
-            // 【關鍵】如果網址有帶步數參數，優先用網址的，不要被雲端資料蓋掉
-            const _urlSteps = new URLSearchParams(window.location.search).get('steps');
-            if (_urlSteps && !isNaN(_urlSteps) && parseFloat(_urlSteps) > 0) {
-                document.getElementById('r-steps').value = _urlSteps;
-            } else {
-                document.getElementById('r-steps').value = r.steps || "";
-            }
+            document.getElementById('r-steps').value = r.steps || "";
             document.getElementById('r-evil').value = r.evil || '否';
 
             // 6. 還原身體狀況指標
@@ -558,13 +552,7 @@ async function onDateChange() {
             toggleEvilContent();
             // 重置生活與身體指標
             document.getElementById('r-water').value = "";
-            // 【關鍵】沒有雲端資料時，也要先檢查網址有沒有帶步數
-            const _urlSteps2 = new URLSearchParams(window.location.search).get('steps');
-            if (_urlSteps2 && !isNaN(_urlSteps2) && parseFloat(_urlSteps2) > 0) {
-                document.getElementById('r-steps').value = _urlSteps2;
-            } else {
-                document.getElementById('r-steps').value = "";
-            }
+            document.getElementById('r-steps').value = "";
             document.getElementById('r-evil').value = '否';
             
             ['stress', 'fatigue', 'poop', 'edema', 'fullness'].forEach(f => {
@@ -1165,46 +1153,34 @@ window.onload = async () => {
     await checkSystemStatus(); 
     await onDateChange();                  
     
-    // 3. 網頁第一次載入時，嘗試抓取網址（onDateChange 之後再填一次，防止被蓋掉）
+    // 3. 網頁第一次載入時，嘗試抓取網址
     syncFromURLParams();
-    // 額外保險：再試一次剪貼簿（處理 PWA 完整重載的情況）
-    await trySyncFromClipboard();
     
     // 4. 🔥【終極修正】處理 iOS PWA 喚醒時的網址延遲 Bug
     // 網頁亮起時，啟動一個每 200 毫秒執行一次的「連環奪命追魂 call」
     // 只要 iOS 一把網址參數塞進來，網頁立刻攔截並填入，然後自動關閉定時器！
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            console.log("PWA 醒來，同時嘗試網址參數與剪貼簿...");
+            console.log("PWA 醒來，啟動連環網址監測...");
             let attempts = 0;
             const maxAttempts = 15; // 最多連抓 3 秒鐘 (15 * 200ms)
             
-            const urlCheckInterval = setInterval(async () => {
+            const urlCheckInterval = setInterval(() => {
                 attempts++;
-                
-                // 優先嘗試網址參數
-                let isSuccess = syncFromURLParams();
-                
-                // 如果網址沒有，改試剪貼簿（這是 iOS Shortcuts 傳資料的主要管道）
-                if (!isSuccess) {
-                    isSuccess = await trySyncFromClipboard();
-                }
+                const isSuccess = syncFromURLParams();
                 
                 // 如果抓成功了，或者超過 3 秒都抓不到，就關閉定時器
                 if (isSuccess || attempts >= maxAttempts) {
                     clearInterval(urlCheckInterval);
-                    console.log(`監測結束，結果：${isSuccess ? '成功填入' : '未發現參數'}`);
+                    console.log(`網址監測結束，結果：${isSuccess ? '成功填入' : '未發現參數'}`);
                 }
             }, 200);
         }
     });
 
-    // 5. 🔥【最終保險】萬一被 iOS 嚴格阻擋，使用者回到 App 點擊螢幕任何地方，立刻補抓！
-    document.addEventListener('click', async function autoParamSyncOnClick() {
-        let success = syncFromURLParams();
-        if (!success) {
-            success = await trySyncFromClipboard();
-        }
+    // 5. 🔥【最終保險】萬一被 iOS 嚴格阻擋，使用者回到 App 隨便點擊螢幕任何地方，立刻再次補抓！
+    document.addEventListener('click', function autoParamSyncOnClick() {
+        const success = syncFromURLParams();
         if (success) {
             // 成功填入後就拆掉監聽器，避免影響後續正常點擊
             document.removeEventListener('click', autoParamSyncOnClick);
