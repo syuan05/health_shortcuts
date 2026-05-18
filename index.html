@@ -1161,26 +1161,36 @@ window.onload = async () => {
     // 只要 iOS 一把網址參數塞進來，網頁立刻攔截並填入，然後自動關閉定時器！
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            console.log("PWA 醒來，啟動連環網址監測...");
+            console.log("PWA 醒來，同時嘗試網址參數與剪貼簿...");
             let attempts = 0;
             const maxAttempts = 15; // 最多連抓 3 秒鐘 (15 * 200ms)
             
-            const urlCheckInterval = setInterval(() => {
+            const urlCheckInterval = setInterval(async () => {
                 attempts++;
-                const isSuccess = syncFromURLParams();
+                
+                // 優先嘗試網址參數
+                let isSuccess = syncFromURLParams();
+                
+                // 如果網址沒有，改試剪貼簿（這是 iOS Shortcuts 傳資料的主要管道）
+                if (!isSuccess) {
+                    isSuccess = await trySyncFromClipboard();
+                }
                 
                 // 如果抓成功了，或者超過 3 秒都抓不到，就關閉定時器
                 if (isSuccess || attempts >= maxAttempts) {
                     clearInterval(urlCheckInterval);
-                    console.log(`網址監測結束，結果：${isSuccess ? '成功填入' : '未發現參數'}`);
+                    console.log(`監測結束，結果：${isSuccess ? '成功填入' : '未發現參數'}`);
                 }
             }, 200);
         }
     });
 
-    // 5. 🔥【最終保險】萬一被 iOS 嚴格阻擋，使用者回到 App 隨便點擊螢幕任何地方，立刻再次補抓！
-    document.addEventListener('click', function autoParamSyncOnClick() {
-        const success = syncFromURLParams();
+    // 5. 🔥【最終保險】萬一被 iOS 嚴格阻擋，使用者回到 App 點擊螢幕任何地方，立刻補抓！
+    document.addEventListener('click', async function autoParamSyncOnClick() {
+        let success = syncFromURLParams();
+        if (!success) {
+            success = await trySyncFromClipboard();
+        }
         if (success) {
             // 成功填入後就拆掉監聽器，避免影響後續正常點擊
             document.removeEventListener('click', autoParamSyncOnClick);
