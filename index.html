@@ -1089,14 +1089,22 @@ function showToast(m){
     setTimeout(()=>t.className='toast',2000); 
 }
 
-// ✨ 封裝成一個獨立的讀取剪貼簿函式
+/// 🔥 激進防禦版：封裝獨立的讀取剪貼簿函式
 async function trySyncFromClipboard() {
     try {
+        // 檢查瀏覽器是否支援剪貼簿 API
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+            console.log("瀏覽器不支援剪貼簿 API");
+            return false;
+        }
+
         const text = await navigator.clipboard.readText();
+        console.log("偵測到剪貼簿內容:", text);
         
         // 安全檢查：確保剪貼簿裡有東西、而且是純數字、大於 0
         if (text && !isNaN(text) && parseFloat(text) > 0) {
-            // 將數字精準填入「每日步數」的輸入框
+            
+            // 將數字精準填入「每日步數」的輸入框 (id 為 r-steps)
             document.getElementById('r-steps').value = text;
             
             // 強迫網頁重新計算進度條與圓圈狀態
@@ -1105,39 +1113,55 @@ async function trySyncFromClipboard() {
             // 跳出提示
             showToast("🍎 步數數據同步成功！");
             
-            // 清空剪貼簿，防止重複填入
+            // 成功填入後清空剪貼簿，防止重複觸發
             await navigator.clipboard.writeText('');
-            return true;
+            return true; // 成功回傳 true 結束定時器
         }
     } catch (err) {
-        console.log("無法讀取剪貼簿:", err);
+        console.log("剪貼簿讀取遭 iOS 隱私權限鎖定:", err.message);
     }
-    return false;
+    return false; // 失敗回傳 false 繼續重試
 }
 
+// 🔥 激進防禦版 window.onload 初始化
 window.onload = async () => {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('r-date').value = today;
     await checkSystemStatus(); 
     await onDateChange();                  
     
-    // 保留原本檢查網址參數的機制
+    // 保留你原本檢查網址參數的舊機制
     checkURLParamsForHealthData();
     
-    // 方案 A：當捷徑閃回 App，網頁重新取得焦點（visibilitychange）時自動讀取
+    // 【終極保險 A】當捷徑閃回 App，網頁重新亮起時，發動「每 0.3 秒瘋狂抓取定時器」
     document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible') {
-            setTimeout(async () => {
-                await trySyncFromClipboard();
-            }, 300);
+            console.log("自檢表 App 重新亮起，發動連環強抓...");
+            
+            let attempts = 0;
+            const maxAttempts = 10; // 最多連抓 10 次 (共計 3 秒鐘)
+            
+            const intervalId = setInterval(async () => {
+                attempts++;
+                console.log(`第 ${attempts} 次自動強抓剪貼簿...`);
+                
+                const isSuccess = await trySyncFromClipboard();
+                
+                // 如果成功填入數據，或者已經撞到重試上限，就立刻清除定時器
+                if (isSuccess || attempts >= maxAttempts) {
+                    clearInterval(intervalId);
+                    console.log("連環強抓結束。");
+                }
+            }, 300); // 每 300 毫秒（0.3秒）轟炸一次
         }
     });
 
-    // 方案 B：萬一被 iOS 擋住安全性，使用者只要回 App 隨便點擊螢幕任何地方，立刻觸發讀取
+    // 【終極保險 B】萬一 A 方案被 iOS 的安全性完全鎖死，使用者只要回 App 隨便點擊螢幕任何地方，立刻強抓！
     document.addEventListener('click', async function autoSyncOnFirstClick() {
+        console.log("使用者點擊螢幕（觸發焦點安全憑證），強制讀取剪貼簿...");
         const success = await trySyncFromClipboard();
         if (success) {
-            // 同步成功後，移除這個點擊監聽器，避免每次點螢幕都去抓剪貼簿
+            // 只要同步成功，就把這個點擊監聽器拆掉，避免每次點螢幕都去讀剪貼簿
             document.removeEventListener('click', autoSyncOnFirstClick);
         }
     }, { once: false }); // 允許重複嘗試直到成功
