@@ -823,28 +823,34 @@ async function checkSystemStatus() {
     const RENDER_URL = "https://health-shortcuts.onrender.com"; 
 
     statusDot.style.background = "#f1c40f";
-    statusText.innerText = "檢測中...";
+    statusText.innerText = "資料庫連線檢測中...";
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 將超時縮短至 8 秒，避免等太久
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超時
         const start = Date.now();
         
-        await fetch(`${RENDER_URL}/health`, {
+        // 關鍵修改：改為呼叫 /db_health
+        const response = await fetch(`${RENDER_URL}/db_health`, {
             method: 'GET',
             signal: controller.signal,
-            cache: "no-cache",
-            mode: 'no-cors'
+            cache: "no-cache"
         });
-        clearTimeout(timeoutId);
         
-        const latency = Date.now() - start;
-        statusDot.style.background = "#2ecc71";
-        statusText.innerText = `系統已連線 (${latency}ms)`;
+        clearTimeout(timeoutId);
+        const result = await response.json();
+        
+        if (response.ok && result.status === 'success') {
+            const latency = Date.now() - start;
+            statusDot.style.background = "#2ecc71"; // 綠燈
+            statusText.innerText = `資料庫已連線 (${latency}ms)`;
+        } else {
+            throw new Error(result.message || "連線失敗");
+        }
     } catch (error) {
-        console.log("連線失敗:", error);
-        statusDot.style.background = "#e74c3c";
-        statusText.innerText = "伺服器或資料庫休眠中";
+        console.log("資料庫連線失敗:", error);
+        statusDot.style.background = "#e74c3c"; // 紅燈
+        statusText.innerText = "資料庫休眠中 (請檢查 Aiven)";
     }
 }
 

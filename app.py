@@ -31,9 +31,20 @@ cloudinary.config(
 # --- 1. 系統診斷路由 ---
 @app.route('/health', methods=['GET'])
 def health():
-    """ 用於前端狀態燈檢查 Render 狀態 """
-    return jsonify({"status": "ok", "db": "connected"}), 200
+    """ 專門給 Render 自動檢查用：純文字回應，絕不連線資料庫，阻止 Log 暴增 """
+    return jsonify({"status": "ok", "message": "Flask is running"}), 200
 
+@app.route('/db_health', methods=['GET'])
+def db_health():
+    """ 專門給網頁前端（index.html）開啟時檢查 Aiven 資料庫狀態 """
+    try:
+        conn = pymysql.connect(**db_config)
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1") # 極輕量查詢，只確認連線是否正常
+        conn.close()
+        return jsonify({"status": "success", "message": "Database connected"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 @app.route('/test', methods=['GET'])
 def test_db():
     """ 手動測試資料庫連線是否正常 """
