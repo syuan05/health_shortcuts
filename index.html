@@ -1124,47 +1124,54 @@ async function trySyncFromClipboard() {
 }
 
 // 🔥 激進防禦版 window.onload 初始化
+// ⭕️ 改成這個激進安全版
 window.onload = async () => {
+    // 1. 先設定日期
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('r-date').value = today;
+    
+    // 2. 檢查連線狀態
     await checkSystemStatus(); 
+    
+    // 3. 載入當天雲端或快取資料（這步會重置欄位）
     await onDateChange();                  
     
-    // 保留你原本檢查網址參數的舊機制
+    // 4. ✨【關鍵移位】所有人都重置完了，最後才從網址抓步數塞進去！
     checkURLParamsForHealthData();
     
-    // 【終極保險 A】當捷徑閃回 App，網頁重新亮起時，發動「每 0.3 秒瘋狂抓取定時器」
+    // 額外保險：如果網址有抓到步數，順手寫入本地自動暫存草稿，防止被其他事件洗掉
+    const stepsParam = new URLSearchParams(window.location.search).get('steps');
+    if (stepsParam && !isNaN(stepsParam) && parseFloat(stepsParam) > 0) {
+        setTimeout(() => {
+            const draftKey = `draft_${document.getElementById('r-date').value}`;
+            if (typeof saveCurrentStateToDraft === 'function') {
+                saveCurrentStateToDraft(draftKey);
+            }
+        }, 100);
+    }
+    
+    // 5. 保留當 App 從背景亮起時的剪貼簿連環強抓保險
     document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible') {
-            console.log("自檢表 App 重新亮起，發動連環強抓...");
-            
             let attempts = 0;
-            const maxAttempts = 10; // 最多連抓 10 次 (共計 3 秒鐘)
-            
+            const maxAttempts = 10;
             const intervalId = setInterval(async () => {
                 attempts++;
-                console.log(`第 ${attempts} 次自動強抓剪貼簿...`);
-                
                 const isSuccess = await trySyncFromClipboard();
-                
-                // 如果成功填入數據，或者已經撞到重試上限，就立刻清除定時器
                 if (isSuccess || attempts >= maxAttempts) {
                     clearInterval(intervalId);
-                    console.log("連環強抓結束。");
                 }
-            }, 300); // 每 300 毫秒（0.3秒）轟炸一次
+            }, 300);
         }
     });
 
-    // 【終極保險 B】萬一 A 方案被 iOS 的安全性完全鎖死，使用者只要回 App 隨便點擊螢幕任何地方，立刻強抓！
+    // 6. 點擊螢幕強抓剪貼簿保險
     document.addEventListener('click', async function autoSyncOnFirstClick() {
-        console.log("使用者點擊螢幕（觸發焦點安全憑證），強制讀取剪貼簿...");
         const success = await trySyncFromClipboard();
         if (success) {
-            // 只要同步成功，就把這個點擊監聽器拆掉，避免每次點螢幕都去讀剪貼簿
             document.removeEventListener('click', autoSyncOnFirstClick);
         }
-    }, { once: false }); // 允許重複嘗試直到成功
+    }, { once: false });
 };
 
 
