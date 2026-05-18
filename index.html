@@ -140,7 +140,15 @@ input[type="time"] {
             </div>
         </div>
       
-        <div class="card"><label class="lbl">日期</label><input type="date" id="r-date" onchange="onDateChange()"></div>
+        <div>
+            <label class="lbl">日期</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="date" id="r-date" onchange="onDateChange()" style="flex: 1; margin: 0;">
+                <button type="button" onclick="syncFromAppleHealth()" style="width: 50px; height: 42px; background: #3498db; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    🔄
+                </button>
+            </div>
+        </div>
     <div class="card">
     <div class="card-title">飲食進度</div>
     <div class="total-box">
@@ -420,6 +428,47 @@ function calcAll(){
         updateQuotaTxt('quota-fried-txt', used.fried);
     }
 }
+// 1. 點擊 🔄 按鈕時，呼叫 iOS 捷徑並傳送當前日期
+function syncFromAppleHealth() {
+    const selectedDate = document.getElementById('r-date').value;
+    if (!selectedDate) {
+        alert("請先選擇日期！");
+        return;
+    }
+    showToast("正在喚醒 iOS 捷徑讀取健康數據...");
+    
+    // 這裡的 name 必須跟你 iPhone 上的捷徑名稱一模一樣
+    // 我們將當前日期作為 input 傳過去
+    window.location.href = `shortcuts://run-shortcut?name=${encodeURIComponent('抓健康資料')}&input=${selectedDate}`;
+}
+
+// 2. 檢查網址有沒有從捷徑帶回來的數據，有就自動填表
+async function checkURLParamsForHealthData() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const steps = urlParams.get('steps');
+    const sleepStart = urlParams.get('sleepStart');
+    const sleepEnd = urlParams.get('sleepEnd');
+    const paramDate = urlParams.get('date');
+
+    if (steps || sleepStart || sleepEnd) {
+        if (paramDate) {
+            document.getElementById('r-date').value = paramDate;
+            await onDateChange(); // ← 等舊資料載入完
+        }
+        // 舊資料載入完才填入捷徑資料（不會被蓋掉）
+        if (steps) document.getElementById('r-steps').value = steps;
+        if (sleepStart) document.getElementById('r-sleep-start').value = sleepStart;
+        if (sleepEnd) document.getElementById('r-sleep-end').value = sleepEnd;
+        if (sleepStart || sleepEnd) calcSleepTime();
+        
+        showToast("🍎 Apple Health 數據同步成功！");
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+}
+
+// 3. 修改原本的 window.onload，讓它初始化時也檢查一次網址
+const originalOnloadFunc = window.onload;
+
 
 function updateBar(k,c,g){ 
     const valEl = document.getElementById('val-'+k);
@@ -1052,16 +1101,13 @@ function showToast(m){
 }
 
 window.onload = async () => {
-    // 1. 設定今日日期
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('r-date').value = today;
-    
-    // 2. 先執行連線檢測
     await checkSystemStatus(); 
-    
-    // 3. 診斷跑完後（不論成功失敗）再讀取數據
-    onDateChange(); 
+    await onDateChange();                  // ← 加 await
+    checkURLParamsForHealthData();
 };
+
 
 </script>
 <div id="crop-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; flex-direction:column; align-items:center; justify-content:center;">
