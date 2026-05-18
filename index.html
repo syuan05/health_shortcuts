@@ -356,26 +356,30 @@ function calcAll(){
         sStatus.style.color = 'var(--accent)';
     }
 
-    // 4. 計算每週剩餘扣打 (動態撈取同週紀錄)
     const currentDateStr = document.getElementById('r-date').value;
     if (currentDateStr) {
-        const curDate = new Date(currentDateStr);
-        // 計算當週的週一與週日
-        const day = curDate.getDay();
-        const diffToMonday = curDate.getDate() - (day === 0 ? 6 : day - 1);
-        const monday = new Date(curDate.setDate(diffToMonday));
-        monday.setHours(0,0,0,0);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        sunday.setHours(23,59,59,999);
+        // 使用獨立的時間物件，避免互相污染
+        const curDateForWeek = new Date(currentDateStr + 'T00:00:00');
+        const day = curDateForWeek.getDay(); // 0 是星期天, 1 是星期一...
+        
+        // 星期天為第一天，所以直接減去當前 day 天數就是當週星期天
+        const sunday = new Date(curDateForWeek);
+        sunday.setDate(curDateForWeek.getDate() - day);
+        sunday.setHours(0, 0, 0, 0);
+        
+        // 星期天往後加 6 天就是當週星期六（一週最後一天）
+        const saturday = new Date(sunday);
+        saturday.setDate(sunday.getDate() + 6);
+        saturday.setHours(23, 59, 59, 999);
 
-        // 初始本週已用計數 (排除今天在畫面上還沒儲存的，改以當前勾選狀態為準)
+        // 初始本週已用計數
         let used = { dessert: 0, drink: 0, fried: 0 };
         
+        // 從本地 records 陣列計算其他天已存的數量
         records.forEach(x => {
-            if (x.date !== currentDateStr) { // 排除當天舊資料
-                const xDate = new Date(x.date);
-                if (xDate >= monday && xDate <= sunday) {
+            if (x.date !== currentDateStr) { // 排除當天畫面上還沒存的
+                const xDate = new Date(x.date + 'T00:00:00');
+                if (xDate >= sunday && xDate <= saturday) {
                     if (x.cheatDessert === "是") used.dessert++;
                     if (x.cheatDrink === "是") used.drink++;
                     if (x.cheatFried === "是") used.fried++;
@@ -383,7 +387,7 @@ function calcAll(){
             }
         });
 
-        // 加上今天目前在畫面上勾選的狀態
+        // 加上當天畫面上即時打勾的狀態
         if (document.getElementById('chk-dessert').checked) used.dessert++;
         if (document.getElementById('chk-drink').checked) used.drink++;
         if (document.getElementById('chk-fried').checked) used.fried++;
@@ -433,6 +437,11 @@ async function onDateChange() {
         if (cloud.status === 'success') {
             r = cloud.data;
             showToast('已載入雲端紀錄');
+            
+            // 🛠️ 新增這段：既然雲端有最新資料，就同步更新本地快取，這樣週扣打才算得到！
+            records = records.filter(x => x.date !== date); // 先移除舊的
+            records.push(r); // 塞入新的
+            localStorage.setItem('hj_records', JSON.stringify(records));
         } else {
             r = records.find(x => x.date === date);
             if(r) showToast('載入本地快取');
