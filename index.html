@@ -523,7 +523,13 @@ async function onDateChange() {
 
             // 5. 還原生活數據
             document.getElementById('r-water').value = r.water || "";
-            document.getElementById('r-steps').value = r.steps || "";
+            // 【關鍵】如果網址有帶步數參數，優先用網址的，不要被雲端資料蓋掉
+            const _urlSteps = new URLSearchParams(window.location.search).get('steps');
+            if (_urlSteps && !isNaN(_urlSteps) && parseFloat(_urlSteps) > 0) {
+                document.getElementById('r-steps').value = _urlSteps;
+            } else {
+                document.getElementById('r-steps').value = r.steps || "";
+            }
             document.getElementById('r-evil').value = r.evil || '否';
 
             // 6. 還原身體狀況指標
@@ -552,7 +558,13 @@ async function onDateChange() {
             toggleEvilContent();
             // 重置生活與身體指標
             document.getElementById('r-water').value = "";
-            document.getElementById('r-steps').value = "";
+            // 【關鍵】沒有雲端資料時，也要先檢查網址有沒有帶步數
+            const _urlSteps2 = new URLSearchParams(window.location.search).get('steps');
+            if (_urlSteps2 && !isNaN(_urlSteps2) && parseFloat(_urlSteps2) > 0) {
+                document.getElementById('r-steps').value = _urlSteps2;
+            } else {
+                document.getElementById('r-steps').value = "";
+            }
             document.getElementById('r-evil').value = '否';
             
             ['stress', 'fatigue', 'poop', 'edema', 'fullness'].forEach(f => {
@@ -1153,8 +1165,10 @@ window.onload = async () => {
     await checkSystemStatus(); 
     await onDateChange();                  
     
-    // 3. 網頁第一次載入時，嘗試抓取網址
+    // 3. 網頁第一次載入時，嘗試抓取網址（onDateChange 之後再填一次，防止被蓋掉）
     syncFromURLParams();
+    // 額外保險：再試一次剪貼簿（處理 PWA 完整重載的情況）
+    await trySyncFromClipboard();
     
     // 4. 🔥【終極修正】處理 iOS PWA 喚醒時的網址延遲 Bug
     // 網頁亮起時，啟動一個每 200 毫秒執行一次的「連環奪命追魂 call」
