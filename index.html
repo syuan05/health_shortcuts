@@ -93,6 +93,14 @@ input, select {
     z-index: 2; /* 提高輸入框層級 */
     min-width: 0;
 }
+input[type="time"] { 
+    -webkit-appearance: none; 
+    appearance: none; 
+    padding: 8px 4px !important; 
+    width: 100% !important; 
+    max-width: 100% !important; 
+    box-sizing: border-box !important; 
+}
 ::placeholder { color: #ccc; opacity: 1; }
 
 .btn-add { width: 100%; padding: 12px; background: #fff; border: 1px dashed var(--accent); color: var(--accent); border-radius: 8px; cursor: pointer; margin-top: 5px; font-weight: 500; position: relative; z-index: 5; }
@@ -208,8 +216,8 @@ input, select {
     </div>
 
     <div style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;">
-        <div style="display: flex; align-items: flex-end; gap: 8px; width: 100%;">
-            <div style="flex: 1;">
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr 1.5fr; gap: 8px; width: 100%; box-sizing: border-box; align-items: end;">
+            <div style="min-width: 0;">
                 <label class="lbl">睡眠</label>
                 <div class="combo-wrap">
                     <input type="number" id="r-sleep-score" placeholder="0">
@@ -218,13 +226,13 @@ input, select {
                     </select>
                 </div>
             </div>
-            <div style="flex: 1.5;">
+            <div style="min-width: 0;">
                 <label class="lbl">入睡時間</label>
-                <input type="time" id="r-sleep-start" onchange="calcSleepTime()" style="padding: 4px; font-size: 13px;">
+                <input type="time" id="r-sleep-start" onchange="calcSleepTime()" style="font-size: 13px;">
             </div>
-            <div style="flex: 1.5;">
+            <div style="min-width: 0;">
                 <label class="lbl">醒來時間</label>
-                <input type="time" id="r-sleep-end" onchange="calcSleepTime()" style="padding: 4px; font-size: 13px;">
+                <input type="time" id="r-sleep-end" onchange="calcSleepTime()" style="font-size: 13px;">
             </div>
         </div>
         <div id="sleep-duration-hint" style="font-size: 11px; color: var(--accent); margin-top: 5px; text-align: right; display: none;">
@@ -533,7 +541,7 @@ const AUTO_SAVE_FIELDS = [
     'r-steps', 'r-water', 'is-exercise', 'r-stress', 
     'r-fatigue', 'r-poop', 'r-edema', 'r-fullness', 'r-evil',
     'r-sleep-score', 'r-sleep-start', 'r-sleep-end',
-    'cheat-dessert', 'cheat-drink', 'cheat-fried'
+    'chk-dessert', 'chk-drink', 'chk-fried'
 ];
 
 // 2. 監聽輸入事件：當使用者打字或改選單時，立刻存入 localStorage
@@ -812,9 +820,9 @@ function exportData() {
     let evilChecklistHtml = '';
     
     if (isEv) {
-        const dIcon = document.getElementById('chk-dessert').checked ? "☑️ [已吃]" : "⬜ [未吃]";
-        const drIcon = document.getElementById('chk-drink').checked ? "☑️ [已吃]" : "⬜ [未吃]";
-        const fIcon = document.getElementById('chk-fried').checked ? "☑️ [已吃]" : "⬜ [未吃]";
+        const dIcon = document.getElementById('chk-dessert').checked ? "☑️" : "⬜";
+        const drIcon = document.getElementById('chk-drink').checked ? "☑️" : "⬜";
+        const fIcon = document.getElementById('chk-fried').checked ? "☑️" : "⬜";
         
         const dRem = document.getElementById('quota-dessert-txt').innerText;
         const drRem = document.getElementById('quota-drink-txt').innerText;
