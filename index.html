@@ -822,45 +822,29 @@ async function checkSystemStatus() {
     const statusDot = document.querySelector('#status-dot');
     const RENDER_URL = "https://health-shortcuts.onrender.com"; 
 
-    async function performCheck() {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
-            const start = Date.now();
-            
-            await fetch(`${RENDER_URL}/health`, {
-                method: 'GET',
-                signal: controller.signal,
-                cache: "no-cache",
-                mode: 'no-cors'  // ← 加這行！避免 CORS 讓 fetch 直接丟 exception
-            });
-            clearTimeout(timeoutId);
-            
-            const latency = Date.now() - start;
-            statusDot.style.background = "#2ecc71";
-            statusText.innerText = `系統已連線 (${latency}ms)`;
-            return true;
-        } catch (error) {
-            console.log("連線嘗試中...", error);
-        }
-        return false;
-    }
-
     statusDot.style.background = "#f1c40f";
     statusText.innerText = "檢測中...";
 
-    const isOk = await performCheck();
-
-    if (!isOk) {
-        statusText.innerText = "伺服器喚醒中...";
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        const retryOk = await performCheck();
-
-        if (!retryOk) {
-            statusDot.style.background = "#e74c3c";
-            statusText.innerText = "資料庫休眠中 (請檢查 Aiven)";
-        }
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 將超時縮短至 8 秒，避免等太久
+        const start = Date.now();
+        
+        await fetch(`${RENDER_URL}/health`, {
+            method: 'GET',
+            signal: controller.signal,
+            cache: "no-cache",
+            mode: 'no-cors'
+        });
+        clearTimeout(timeoutId);
+        
+        const latency = Date.now() - start;
+        statusDot.style.background = "#2ecc71";
+        statusText.innerText = `系統已連線 (${latency}ms)`;
+    } catch (error) {
+        console.log("連線失敗:", error);
+        statusDot.style.background = "#e74c3c";
+        statusText.innerText = "伺服器或資料庫休眠中";
     }
 }
 
