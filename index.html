@@ -1104,8 +1104,37 @@ window.onload = async () => {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('r-date').value = today;
     await checkSystemStatus(); 
-    await onDateChange();                  // ← 加 await
+    await onDateChange();                  
+    
+    // 1. 保留你原本檢查網址參數的機制
     checkURLParamsForHealthData();
+    
+    // 2. ✨ 新增：當捷徑用 webapp:// 喚醒 App 時，自動觸發讀取剪貼簿
+    // 延遲 300 毫秒執行，確保 PWA 畫面切換時網頁元件已經完全就緒
+    setTimeout(async () => {
+        try {
+            // 嘗試讀取剪貼簿的文字
+            const text = await navigator.clipboard.readText();
+            
+            // 安全檢查：確保剪貼簿裡有東西、而且是純數字、大於 0（避免生活中的其他複製文字誤填）
+            if (text && !isNaN(text) && parseFloat(text) > 0) {
+                
+                // 將數字精準填入「每日步數」的輸入框（id 為 r-steps）
+                document.getElementById('r-steps').value = text;
+                
+                // 強迫網頁重新計算進度條與圓圈狀態
+                calcAll();
+                
+                // 跳出你網頁內建的黑色提示框
+                showToast("🍎 步數數據同步成功！");
+                
+                // 清空剪貼簿，防止使用者下次「手動正常打開」App 時又重複填入舊數據
+                await navigator.clipboard.writeText('');
+            }
+        } catch (err) {
+            console.log("無法讀取剪貼簿或使用者拒絕權限:", err);
+        }
+    }, 300);
 };
 
 
