@@ -1081,144 +1081,104 @@ async function waitImages(el){
     const imgs=[...el.querySelectorAll('img')];
     await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=res;img.onerror=res;})));
 }
-async function batchExportToPhotos(){
-    const start = document.getElementById('batch-start').value;
-    const end = document.getElementById('batch-end').value;
+async function renderAndUploadBatchDate(date){
+    const gr=await fetch(`${BASE_URL}/get_record?date=${date}&t=${Date.now()}`);
+    if(!gr.ok) throw new Error(`讀取 ${date} 失敗`);
+    const gj=await gr.json();
+    if(gj.status!=='success') return null;
 
-    if(!start || !end || start > end){
-        return alert('請確認日期區間');
-    }
-
-    const dates = dateRange(start, end);
-
-    if(dates.length > 31){
-        return alert('一次最多匯出 31 天');
-    }
-
-    const btn = document.getElementById('batch-go');
-    const prog = document.getElementById('batch-progress');
-
-    btn.disabled = true;
-
+    let el=null;
     try{
-        const imageUrls = [];
+        el=makeBatchReportElement(gj.data);
+        await waitImages(el);
+        await new Promise(r=>setTimeout(r,30));
 
-        for(let i = 0; i < dates.length; i++){
+        const canvas=await html2canvas(el,{
+            scale:1.5,
+            backgroundColor:'#f7f5f2',
+            useCORS:true,
+            allowTaint:false,
+            logging:false
+        });
 
-            prog.textContent =
-                `正在處理 ${dates[i]}（${i+1}/${dates.length}）...`;
-
-            // 取得當日紀錄
-            const gr = await fetch(
-                `${BASE_URL}/get_record?date=${dates[i]}&t=${Date.now()}`
-            );
-
-            if(!gr.ok){
-                throw new Error(`讀取 ${dates[i]} 失敗`);
-            }
-
-            const gj = await gr.json();
-
-            // 沒資料就跳過
-            if(gj.status !== 'success'){
-                continue;
-            }
-
-            // 產生報表
-            const el = makeBatchReportElement(gj.data);
-
-            await waitImages(el);
-
-            const canvas = await html2canvas(el,{
-                scale: 2,
-                backgroundColor: '#f7f5f2',
-                useCORS: true,
-                allowTaint: false
-            });
-
-            el.remove();
-
-            // 上傳 JPG
-            const up = await fetch(`${BASE_URL}/upload`,{
-                method: 'POST',
-                headers:{
-                    'Content-Type':'application/json'
-                },
-                body: JSON.stringify({
-                    image: canvas.toDataURL('image/jpeg',0.9)
-                })
-            });
-
-            if(!up.ok){
-                throw new Error(`${dates[i]} 圖片上傳失敗`);
-            }
-
-            const uj = await up.json();
-
-            if(uj.status === 'success'){
-                imageUrls.push({
-                    date: dates[i],
-                    url: uj.url
-                });
-            }
-        }
-
-        if(!imageUrls.length){
-            throw new Error('此區間沒有可匯出的紀錄');
-        }
-
-        // 建立批次 manifest
-        prog.textContent = '正在建立批次清單...';
-
-        const cr = await fetch(`${BASE_URL}/create_export_batch`,{
+        const up=await fetch(`${BASE_URL}/upload`,{
             method:'POST',
-            headers:{
-                'Content-Type':'application/json'
-            },
+            headers:{'Content-Type':'application/json'},
             body:JSON.stringify({
-                images:imageUrls
+                image:canvas.toDataURL('image/jpeg',0.8)
             })
         });
 
-        if(!cr.ok){
-            throw new Error('建立批次清單失敗');
-        }
-
-        const cj = await cr.json();
-
-        if(cj.status !== 'success'){
-            throw new Error(cj.message || '建立批次失敗');
-        }
-
-        if(!cj.manifest_url){
-            throw new Error('後端沒有回傳 manifest_url');
-        }
-
-        prog.textContent =
-            `已產生 ${imageUrls.length} 張，正在開啟捷徑...`;
-
-        // ===== iPhone Shortcuts =====
-        const shortcutName = '健康報表批次匯出';
-
-        const shortcutURL =
-            'shortcuts://run-shortcut' +
-            '?name=' + encodeURIComponent(shortcutName) +
-            '&input=text' +
-            '&text=' + encodeURIComponent(cj.manifest_url);
-
-        console.log('Shortcut URL:', shortcutURL);
-
-        window.location.href = shortcutURL;
-
-    }catch(e){
-
-        console.error(e);
-        alert('批次匯出失敗：' + e.message);
-
+        if(!up.ok) throw new Error(`${date} 圖片上傳失敗`);
+        const uj=await up.json();
+        if(uj.status!=='success'||!uj.url) throw new Error(`${date} 圖片上傳失敗`);
+        return {date,url:uj.url};
     }finally{
+        if(el&&el.isConnected) el.remove();
+    }
+}
 
-        btn.disabled = false;
+async function batchExportToPhotos(){
+    const start=document.getElementById('batch-start').value;
+    const end=document.getElementById('batch-end').value;
+    if(!start||!end||start>end) return alert('請確認日期區間');
 
+    const dates=dateRange(start,end);
+    if(dates.length>31) return alert('一次最多匯出 31 天');
+
+    const btn=document.getElementById('batch-go');
+    const prog=document.getElementById('batch-progress');
+    btn.disabled=true;
+
+    try{
+        const imageUrls=[];
+        const CONCURRENCY=3;
+        let finished=0;
+
+        for(let i=0;i<dates.length;i+=CONCURRENCY){
+            const chunk=dates.slice(i,i+CONCURRENCY);
+            prog.textContent=`正在處理 ${chunk[0]} ～ ${chunk[chunk.length-1]}（${finished}/${dates.length}）...`;
+
+            const results=await Promise.all(chunk.map(async date=>{
+                const result=await renderAndUploadBatchDate(date);
+                finished++;
+                prog.textContent=`已處理 ${finished}/${dates.length} 天...`;
+                return result;
+            }));
+
+            results.forEach(x=>{if(x) imageUrls.push(x);});
+            await new Promise(r=>setTimeout(r,80));
+        }
+
+        if(!imageUrls.length) throw new Error('此區間沒有可匯出的紀錄');
+
+        prog.textContent=`已產生 ${imageUrls.length} 張，正在建立批次清單...`;
+
+        const cr=await fetch(`${BASE_URL}/create_export_batch`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({images:imageUrls})
+        });
+        if(!cr.ok) throw new Error('建立批次清單失敗');
+
+        const cj=await cr.json();
+        if(cj.status!=='success') throw new Error(cj.message||'建立批次失敗');
+        if(!cj.manifest_url) throw new Error('後端沒有回傳 manifest_url');
+
+        prog.textContent=`已產生 ${imageUrls.length} 張，正在開啟捷徑...`;
+
+        const shortcutName='健康報表批次匯出';
+        const shortcutURL='shortcuts://run-shortcut'
+            +'?name='+encodeURIComponent(shortcutName)
+            +'&input=text'
+            +'&text='+encodeURIComponent(cj.manifest_url);
+
+        window.location.href=shortcutURL;
+    }catch(e){
+        console.error(e);
+        alert('批次匯出失敗：'+e.message);
+    }finally{
+        btn.disabled=false;
     }
 }
 
