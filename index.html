@@ -142,11 +142,8 @@ input[type="time"] {
       
         <div>
             <label class="lbl">日期</label>
-            <div style="display: flex; gap: 8px; align-items: center;">
+            <div style="display: flex; align-items: center;">
                 <input type="date" id="r-date" onchange="onDateChange()" style="flex: 1; margin: 0;">
-                <button type="button" onclick="syncFromAppleHealth()" style="width: 50px; height: 42px; background: #3498db; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    🔄
-                </button>
             </div>
         </div>
     <div class="card">
@@ -197,18 +194,27 @@ input[type="time"] {
             ⚠️ 每週放縱扣打上限 2 次（以下複選）
         </div>
         <div style="display:flex; flex-direction:column; gap:10px;">
-            <label style="display:flex; justify-content:space-between; align-items:center; font-size:14px; cursor:pointer;">
-                <span><input type="checkbox" id="chk-dessert" onchange="calcAll()" style="width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🍩 甜點/精緻澱粉</span>
-                <span id="quota-dessert-txt" style="font-size:12px; color:var(--text2);">剩餘 -- 次</span>
-            </label>
-            <label style="display:flex; justify-content:space-between; align-items:center; font-size:14px; cursor:pointer;">
-                <span><input type="checkbox" id="chk-drink" onchange="calcAll()" style="width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🧋 飲料</span>
-                <span id="quota-drink-txt" style="font-size:12px; color:var(--text2);">剩餘 -- 次</span>
-            </label>
-            <label style="display:flex; justify-content:space-between; align-items:center; font-size:14px; cursor:pointer;">
-                <span><input type="checkbox" id="chk-fried" onchange="calcAll()" style="style; width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🍗 炸物/高油鹽</span>
-                <span id="quota-fried-txt" style="font-size:12px; color:var(--text2);">剩餘 -- 次</span>
-            </label>
+            <div style="display:grid; grid-template-columns:1fr 82px auto; gap:8px; align-items:center; font-size:14px;">
+                <span>🍩 甜點/精緻澱粉</span>
+                <select id="count-dessert" onchange="calcAll()" style="height:38px;">
+                    <option value="0">0 次</option><option value="1">1 次</option><option value="2">2 次</option><option value="3">3 次</option><option value="4">4 次</option><option value="5">5 次</option>
+                </select>
+                <span id="quota-dessert-txt" style="font-size:12px; color:var(--text2);">0/2</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 82px auto; gap:8px; align-items:center; font-size:14px;">
+                <span>🧋 飲料</span>
+                <select id="count-drink" onchange="calcAll()" style="height:38px;">
+                    <option value="0">0 次</option><option value="1">1 次</option><option value="2">2 次</option><option value="3">3 次</option><option value="4">4 次</option><option value="5">5 次</option>
+                </select>
+                <span id="quota-drink-txt" style="font-size:12px; color:var(--text2);">0/2</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 82px auto; gap:8px; align-items:center; font-size:14px;">
+                <span>🍗 炸物/高油鹽</span>
+                <select id="count-fried" onchange="calcAll()" style="height:38px;">
+                    <option value="0">0 次</option><option value="1">1 次</option><option value="2">2 次</option><option value="3">3 次</option><option value="4">4 次</option><option value="5">5 次</option>
+                </select>
+                <span id="quota-fried-txt" style="font-size:12px; color:var(--text2);">0/2</span>
+            </div>
         </div>
     </div>
   </div>
@@ -337,9 +343,9 @@ function toggleEvilContent() {
     document.getElementById('evil-content').style.display = isEvil ? 'block' : 'none';
     if (!isEvil) {
         // 如果選否，自動清空打勾
-        document.getElementById('chk-dessert').checked = false;
-        document.getElementById('chk-drink').checked = false;
-        document.getElementById('chk-fried').checked = false;
+        document.getElementById('count-dessert').value = '0';
+        document.getElementById('count-drink').value = '0';
+        document.getElementById('count-fried').value = '0';
         calcAll();
     }
 }
@@ -410,17 +416,17 @@ function calcAll(){
             if (x.date !== currentDateStr) { // 排除當天畫面上還沒存的
                 const xDate = new Date(x.date + 'T00:00:00');
                 if (xDate >= sunday && xDate <= saturday) {
-                    if (x.cheatDessert === "是") used.dessert++;
-                    if (x.cheatDrink === "是") used.drink++;
-                    if (x.cheatFried === "是") used.fried++;
+                    used.dessert += Number(x.cheatDessertCount ?? (x.cheatDessert === "是" ? 1 : 0)) || 0;
+                    used.drink += Number(x.cheatDrinkCount ?? (x.cheatDrink === "是" ? 1 : 0)) || 0;
+                    used.fried += Number(x.cheatFriedCount ?? (x.cheatFried === "是" ? 1 : 0)) || 0;
                 }
             }
         });
 
         // 加上當天畫面上即時打勾的狀態
-        if (document.getElementById('chk-dessert').checked) used.dessert++;
-        if (document.getElementById('chk-drink').checked) used.drink++;
-        if (document.getElementById('chk-fried').checked) used.fried++;
+        used.dessert += Number(document.getElementById('count-dessert').value) || 0;
+        used.drink += Number(document.getElementById('count-drink').value) || 0;
+        used.fried += Number(document.getElementById('count-fried').value) || 0;
 
         // 更新介面文字顯示
         const updateQuotaTxt = (id, usedCount) => {
@@ -429,9 +435,12 @@ function calcAll(){
 
             const count = usedCount || 0; // 確保數值安全
             
-            if (count >= 2) {
-                // 超過或達到 2 次顯示紅色警告
+            if (count > 2) {
+                // 超過 2 次才顯示紅色警告
                 el.innerHTML = `<span style="color:var(--red); font-weight:bold;">${count}/2 ⚠️</span>`;
+            } else if (count === 2) {
+                // 剛好達到上限，不顯示驚嘆號
+                el.innerHTML = `<b style="color:var(--accent)">${count}/2</b>`;
             } else {
                 // 未滿 2 次顯示綠色安全字體
                 el.innerHTML = `<b style="color:var(--green)">${count}/2</b>`;
@@ -519,9 +528,9 @@ async function onDateChange() {
             document.getElementById('r-sleep-end').value = r.sleepEnd || "";
             calcSleepTime(); // 載入後立刻計算總時數顯示
             document.getElementById('r-evil').value = r.evil || '否';
-            document.getElementById('chk-dessert').checked = r.cheatDessert === "是";
-            document.getElementById('chk-drink').checked = r.cheatDrink === "是";
-            document.getElementById('chk-fried').checked = r.cheatFried === "是";
+            document.getElementById('count-dessert').value = String(r.cheatDessertCount ?? (r.cheatDessert === "是" ? 1 : 0));
+            document.getElementById('count-drink').value = String(r.cheatDrinkCount ?? (r.cheatDrink === "是" ? 1 : 0));
+            document.getElementById('count-fried').value = String(r.cheatFriedCount ?? (r.cheatFried === "是" ? 1 : 0));
             toggleEvilContent();
             // 3. 還原飲食紀錄
             if (r.meals && r.meals.length > 0) {
@@ -560,9 +569,9 @@ async function onDateChange() {
             document.getElementById('sleep-duration-hint').style.display = 'none';
 
             document.getElementById('r-evil').value = '否';
-            document.getElementById('chk-dessert').checked = false;
-            document.getElementById('chk-drink').checked = false;
-            document.getElementById('chk-fried').checked = false;
+            document.getElementById('count-dessert').value = '0';
+            document.getElementById('count-drink').value = '0';
+            document.getElementById('count-fried').value = '0';
             toggleEvilContent();
             // 重置生活與身體指標
             document.getElementById('r-water').value = "";
@@ -593,7 +602,7 @@ const AUTO_SAVE_FIELDS = [
     'r-steps', 'r-water', 'is-exercise', 'r-stress', 
     'r-fatigue', 'r-poop', 'r-edema', 'r-fullness', 'r-evil',
     'r-sleep-score', 'r-sleep-start', 'r-sleep-end',
-    'chk-dessert', 'chk-drink', 'chk-fried'
+    'count-dessert', 'count-drink', 'count-fried'
 ];
 
 // 2. 監聽輸入事件：當使用者打字或改選單時，立刻存入 localStorage
@@ -645,9 +654,9 @@ function saveCurrentStateToDraft(key) {
         sleepScore: document.getElementById('r-sleep-score').value,
         sleepStart: document.getElementById('r-sleep-start').value,
         sleepEnd: document.getElementById('r-sleep-end').value,
-        cheatDessert: document.getElementById('chk-dessert').checked ? "是" : "否",
-        cheatDrink: document.getElementById('chk-drink').checked ? "是" : "否",
-        cheatFried: document.getElementById('chk-fried').checked ? "是" : "否"
+        cheatDessertCount: Number(document.getElementById('count-dessert').value) || 0,
+        cheatDrinkCount: Number(document.getElementById('count-drink').value) || 0,
+        cheatFriedCount: Number(document.getElementById('count-fried').value) || 0
     };
     localStorage.setItem(key, JSON.stringify(draftData));
 }
@@ -674,9 +683,9 @@ function loadDraft(date) {
     });
     
     // 補回並修正斷掉的這段
-    document.getElementById('chk-dessert').checked = draftData.cheatDessert === "是";
-    document.getElementById('chk-drink').checked = draftData.cheatDrink === "是";
-    document.getElementById('chk-fried').checked = draftData.cheatFried === "是"; // 修正原本寫錯的 "原"
+    document.getElementById('count-dessert').value = String(draftData.cheatDessertCount ?? (draftData.cheatDessert === "是" ? 1 : 0));
+    document.getElementById('count-drink').value = String(draftData.cheatDrinkCount ?? (draftData.cheatDrink === "是" ? 1 : 0));
+    document.getElementById('count-fried').value = String(draftData.cheatFriedCount ?? (draftData.cheatFried === "是" ? 1 : 0));
     toggleEvilContent();
     toggleExercise();
     calcAll();
@@ -806,9 +815,9 @@ async function saveRecord() {
             water: document.getElementById('r-water').value,
             steps: document.getElementById('r-steps').value,
             evil: document.getElementById('r-evil').value,
-            cheatDessert: document.getElementById('chk-dessert').checked ? "是" : "否",
-            cheatDrink: document.getElementById('chk-drink').checked ? "是" : "否",
-            cheatFried: document.getElementById('chk-fried').checked ? "是" : "否",
+            cheatDessertCount: Number(document.getElementById('count-dessert').value) || 0,
+            cheatDrinkCount: Number(document.getElementById('count-drink').value) || 0,
+            cheatFriedCount: Number(document.getElementById('count-fried').value) || 0,
             stress: document.getElementById('r-stress').value,
             fatigue: document.getElementById('r-fatigue').value,
             poop: document.getElementById('r-poop').value,
@@ -872,9 +881,9 @@ function exportData() {
     let evilChecklistHtml = '';
     
     if (isEv) {
-        const dIcon = document.getElementById('chk-dessert').checked ? "☑️" : "⬜";
-        const drIcon = document.getElementById('chk-drink').checked ? "☑️" : "⬜";
-        const fIcon = document.getElementById('chk-fried').checked ? "☑️" : "⬜";
+        const dCount = Number(document.getElementById('count-dessert').value) || 0;
+        const drCount = Number(document.getElementById('count-drink').value) || 0;
+        const fCount = Number(document.getElementById('count-fried').value) || 0;
         
         const dRem = document.getElementById('quota-dessert-txt').innerText;
         const drRem = document.getElementById('quota-drink-txt').innerText;
@@ -883,9 +892,9 @@ function exportData() {
         evilChecklistHtml = `
             <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c44040; padding-left:8px; margin-top:15px;">😈 邪惡食物放縱清單</div>
             <div style="background:#fff5f5; border-radius:10px; padding:12px; border:1px solid #fbd5d5; color:#c44040; font-size:13px; margin-bottom:15px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${dIcon} 🍩 甜點/精緻澱粉</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${dRem}</span></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${drIcon} 🧋 飲料</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${drRem}</span></div>
-                <div style="display:flex; justify-content:space-between;"><span>${fIcon} 🍗 炸物/高油鹽</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${fRem}</span></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>🍩 甜點/精緻澱粉：<b>${dCount} 次</b></span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${dRem}</span></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>🧋 飲料：<b>${drCount} 次</b></span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${drRem}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>🍗 炸物/高油鹽：<b>${fCount} 次</b></span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${fRem}</span></div>
             </div>
         `;
     }
@@ -1070,7 +1079,7 @@ function makeBatchReportElement(r){
     let mealsHtml=meals.map(m=>`<div style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px;border:1px solid #e2ddd6"><div style="display:flex;justify-content:space-between;margin-bottom:8px;align-items:center"><span style="font-weight:bold;color:#c4773a;font-size:16px">🍴 ${esc(m.type)}</span><div style="font-size:12px"><span style="color:#c4773a;font-weight:bold;margin-left:4px">主食 ${esc(m.carb||0)}</span><span style="color:#3a7c5e;font-weight:bold;margin-left:4px">蛋白 ${esc(m.prot||0)}</span><span style="color:#4a90e2;font-weight:bold;margin-left:4px">蔬菜 ${esc(m.veg||0)}</span></div></div>${m.img?`<img crossorigin="anonymous" src="${esc(m.img)}" style="width:100%;border-radius:6px;margin-bottom:8px;display:block">`:''}${m.note?`<div style="font-size:12px;color:#6b6560;background:#f9f9f9;padding:6px;border-radius:4px">${esc(m.note)}</div>`:''}</div>`).join('');
     const evil=r.evil||'否';
     let evilHtml='';
-    if(evil==='是') evilHtml=`<div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #c44040;padding-left:8px;margin-top:15px">😈 邪惡食物放縱清單</div><div style="background:#fff5f5;border-radius:10px;padding:12px;border:1px solid #fbd5d5;color:#c44040;font-size:13px;margin-bottom:15px"><div> ${r.cheatDessert==='是'?'☑️':'⬜'} 🍩 甜點/精緻澱粉</div><div> ${r.cheatDrink==='是'?'☑️':'⬜'} 🧋 飲料</div><div> ${r.cheatFried==='是'?'☑️':'⬜'} 🍗 炸物/高油鹽</div></div>`;
+    if(evil==='是') evilHtml=`<div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #c44040;padding-left:8px;margin-top:15px">😈 邪惡食物放縱清單</div><div style="background:#fff5f5;border-radius:10px;padding:12px;border:1px solid #fbd5d5;color:#c44040;font-size:13px;margin-bottom:15px"><div> 🍩 甜點/精緻澱粉：<b>${Number(r.cheatDessertCount ?? (r.cheatDessert==='是'?1:0))||0} 次</b></div><div> 🧋 飲料：<b>${Number(r.cheatDrinkCount ?? (r.cheatDrink==='是'?1:0))||0} 次</b></div><div> 🍗 炸物/高油鹽：<b>${Number(r.cheatFriedCount ?? (r.cheatFried==='是'?1:0))||0} 次</b></div></div>`;
     let exerHtml='';
     if(r.isExercise==='是') exerHtml=`<div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #3a7c5e;padding-left:8px;margin-top:15px">💪 運動紀錄</div><div style="background:#eaf2ee;border-radius:10px;padding:12px;border:1px solid #d1e2d9;color:#3a7c5e;margin-bottom:15px">${(r.exerList||[]).map(x=>`<div style="font-size:13px;margin-bottom:4px">🏃 <b>${esc(x.name)}</b>: ${esc(x.str)}</div>`).join('')||'有運動（未填寫項目）'}</div>`;
     const water=parseFloat(r.water)||0, steps=parseFloat(r.steps)||0;
