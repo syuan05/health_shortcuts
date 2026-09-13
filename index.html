@@ -1032,10 +1032,27 @@ function openBatchExport(){
     document.getElementById('batch-export-modal').style.display='flex';
 }
 function closeBatchExport(){ document.getElementById('batch-export-modal').style.display='none'; }
-function dateRange(start,end){
-    const out=[]; let d=new Date(start+'T00:00:00'), e=new Date(end+'T00:00:00');
-    while(d<=e){ out.push(d.toISOString().split('T')[0]); d.setDate(d.getDate()+1); }
-    return out;
+function dateRange(start, end){
+    const result = [];
+
+    const [sy, sm, sd] = start.split('-').map(Number);
+    const [ey, em, ed] = end.split('-').map(Number);
+
+    const current = new Date(sy, sm - 1, sd, 12, 0, 0);
+    const last = new Date(ey, em - 1, ed, 12, 0, 0);
+
+    while(current <= last){
+
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2,'0');
+        const d = String(current.getDate()).padStart(2,'0');
+
+        result.push(`${y}-${m}-${d}`);
+
+        current.setDate(current.getDate() + 1);
+    }
+
+    return result;
 }
 function esc(v){ return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function sleepDurationText(start,end){
@@ -1065,31 +1082,144 @@ async function waitImages(el){
     await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=res;img.onerror=res;})));
 }
 async function batchExportToPhotos(){
-    const start=document.getElementById('batch-start').value,end=document.getElementById('batch-end').value;
-    if(!start||!end||start>end) return alert('請確認日期區間');
-    const dates=dateRange(start,end); if(dates.length>31) return alert('一次最多匯出 31 天');
-    const btn=document.getElementById('batch-go'), prog=document.getElementById('batch-progress'); btn.disabled=true;
+    const start = document.getElementById('batch-start').value;
+    const end = document.getElementById('batch-end').value;
+
+    if(!start || !end || start > end){
+        return alert('請確認日期區間');
+    }
+
+    const dates = dateRange(start, end);
+
+    if(dates.length > 31){
+        return alert('一次最多匯出 31 天');
+    }
+
+    const btn = document.getElementById('batch-go');
+    const prog = document.getElementById('batch-progress');
+
+    btn.disabled = true;
+
     try{
-        const imageUrls=[];
-        for(let i=0;i<dates.length;i++){
-            prog.textContent=`正在處理 ${dates[i]}（${i+1}/${dates.length}）...`;
-            const gr=await fetch(`${BASE_URL}/get_record?date=${dates[i]}&t=${Date.now()}`); const gj=await gr.json();
-            if(gj.status!=='success') continue;
-            const el=makeBatchReportElement(gj.data); await waitImages(el);
-            const canvas=await html2canvas(el,{scale:2,backgroundColor:'#f7f5f2',useCORS:true,allowTaint:false});
+        const imageUrls = [];
+
+        for(let i = 0; i < dates.length; i++){
+
+            prog.textContent =
+                `正在處理 ${dates[i]}（${i+1}/${dates.length}）...`;
+
+            // 取得當日紀錄
+            const gr = await fetch(
+                `${BASE_URL}/get_record?date=${dates[i]}&t=${Date.now()}`
+            );
+
+            if(!gr.ok){
+                throw new Error(`讀取 ${dates[i]} 失敗`);
+            }
+
+            const gj = await gr.json();
+
+            // 沒資料就跳過
+            if(gj.status !== 'success'){
+                continue;
+            }
+
+            // 產生報表
+            const el = makeBatchReportElement(gj.data);
+
+            await waitImages(el);
+
+            const canvas = await html2canvas(el,{
+                scale: 2,
+                backgroundColor: '#f7f5f2',
+                useCORS: true,
+                allowTaint: false
+            });
+
             el.remove();
-            const up=await fetch(`${BASE_URL}/upload`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:canvas.toDataURL('image/jpeg',0.9)})});
-            const uj=await up.json(); if(uj.status==='success') imageUrls.push({date:dates[i],url:uj.url});
+
+            // 上傳 JPG
+            const up = await fetch(`${BASE_URL}/upload`,{
+                method: 'POST',
+                headers:{
+                    'Content-Type':'application/json'
+                },
+                body: JSON.stringify({
+                    image: canvas.toDataURL('image/jpeg',0.9)
+                })
+            });
+
+            if(!up.ok){
+                throw new Error(`${dates[i]} 圖片上傳失敗`);
+            }
+
+            const uj = await up.json();
+
+            if(uj.status === 'success'){
+                imageUrls.push({
+                    date: dates[i],
+                    url: uj.url
+                });
+            }
         }
-        if(!imageUrls.length) throw new Error('此區間沒有可匯出的紀錄');
-        prog.textContent='正在建立批次清單...';
-        const cr=await fetch(`${BASE_URL}/create_export_batch`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:imageUrls})});
-        const cj=await cr.json(); if(cj.status!=='success') throw new Error(cj.message||'建立批次失敗');
-        prog.textContent=`已產生 ${imageUrls.length} 張，正在開啟捷徑...`;
-        const shortcutName='健康報表批次匯出';
-        window.location.href=`shortcuts://run-shortcut?name=${encodeURIComponent(shortcutName)}&input=${encodeURIComponent(cj.manifest_url)}`;
-    }catch(e){ console.error(e); alert('批次匯出失敗：'+e.message); }
-    finally{btn.disabled=false;}
+
+        if(!imageUrls.length){
+            throw new Error('此區間沒有可匯出的紀錄');
+        }
+
+        // 建立批次 manifest
+        prog.textContent = '正在建立批次清單...';
+
+        const cr = await fetch(`${BASE_URL}/create_export_batch`,{
+            method:'POST',
+            headers:{
+                'Content-Type':'application/json'
+            },
+            body:JSON.stringify({
+                images:imageUrls
+            })
+        });
+
+        if(!cr.ok){
+            throw new Error('建立批次清單失敗');
+        }
+
+        const cj = await cr.json();
+
+        if(cj.status !== 'success'){
+            throw new Error(cj.message || '建立批次失敗');
+        }
+
+        if(!cj.manifest_url){
+            throw new Error('後端沒有回傳 manifest_url');
+        }
+
+        prog.textContent =
+            `已產生 ${imageUrls.length} 張，正在開啟捷徑...`;
+
+        // ===== iPhone Shortcuts =====
+        const shortcutName = '健康報表批次匯出';
+
+        const shortcutURL =
+            'shortcuts://run-shortcut' +
+            '?name=' + encodeURIComponent(shortcutName) +
+            '&input=text' +
+            '&text=' + encodeURIComponent(cj.manifest_url);
+
+        console.log('Shortcut URL:', shortcutURL);
+
+        window.location.href = shortcutURL;
+
+    }catch(e){
+
+        console.error(e);
+        alert('批次匯出失敗：' + e.message);
+
+    }finally{
+
+        btn.disabled = false;
+
+    }
 }
 
 async function checkSystemStatus() {
