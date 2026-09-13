@@ -1360,11 +1360,9 @@ window.onload = async () => {
         }
     });
 
-    // 5. 🔥【最終保險】萬一被 iOS 嚴格阻擋，使用者回到 App 隨便點擊螢幕任何地方，立刻再次補抓！
     document.addEventListener('click', function autoParamSyncOnClick() {
         const success = syncFromURLParams();
         if (success) {
-            // 成功填入後就拆掉監聽器，避免影響後續正常點擊
             document.removeEventListener('click', autoParamSyncOnClick);
         }
     });
