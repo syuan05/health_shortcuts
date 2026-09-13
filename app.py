@@ -5,6 +5,8 @@ import json
 import cloudinary
 import cloudinary.uploader
 import os
+import uuid
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 # 允許跨域請求，讓你的網頁（前端）可以呼叫這個 API
@@ -103,41 +105,6 @@ def get_record():
         if conn:
             conn.close()
 
-
-@app.route('/get_records', methods=['GET'])
-def get_records():
-    """依據開始/結束日期一次抓取區間紀錄，供 iOS 捷徑批次匯出使用。"""
-    start = request.args.get('start')
-    end = request.args.get('end')
-    if not start or not end:
-        return jsonify({"status": "error", "message": "Missing start/end"}), 400
-
-    conn = None
-    try:
-        conn = pymysql.connect(**db_config)
-        with conn.cursor() as cursor:
-            sql = """
-                SELECT record_date, raw_json
-                FROM daily_records
-                WHERE record_date BETWEEN %s AND %s
-                ORDER BY record_date ASC
-            """
-            cursor.execute(sql, (start, end))
-            rows = cursor.fetchall()
-
-        data = []
-        for row in rows:
-            if row.get('raw_json'):
-                rec = json.loads(row['raw_json'])
-                rec['date'] = str(row['record_date'])
-                data.append(rec)
-        return jsonify({"status": "success", "data": data, "count": len(data)})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        if conn:
-            conn.close()
-
 @app.route('/delete', methods=['POST'])
 def delete_record():
     """ 依據日期刪除雲端紀錄 """
@@ -160,6 +127,58 @@ def delete_record():
     finally:
         if conn:
             conn.close()    
+
+
+def ensure_export_batch_table(conn):
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS export_batches (
+                token VARCHAR(64) PRIMARY KEY,
+                images_json LONGTEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) CHARACTER SET utf8mb4
+        """)
+    conn.commit()
+
+@app.route('/create_export_batch', methods=['POST'])
+def create_export_batch():
+    data = request.json or {}
+    images = data.get('images') or []
+    if not images:
+        return jsonify({'status':'error','message':'沒有圖片'}), 400
+    token = uuid.uuid4().hex
+    conn = None
+    try:
+        conn = pymysql.connect(**db_config)
+        ensure_export_batch_table(conn)
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM export_batches WHERE created_at < NOW() - INTERVAL 2 DAY")
+            cursor.execute("INSERT INTO export_batches (token, images_json) VALUES (%s,%s)",
+                           (token, json.dumps(images, ensure_ascii=False)))
+        conn.commit()
+        manifest_url = request.host_url.rstrip('/') + '/export_batch/' + token
+        return jsonify({'status':'success','token':token,'manifest_url':manifest_url,'count':len(images)})
+    except Exception as e:
+        return jsonify({'status':'error','message':str(e)}), 500
+    finally:
+        if conn: conn.close()
+
+@app.route('/export_batch/<token>', methods=['GET'])
+def export_batch(token):
+    conn = None
+    try:
+        conn = pymysql.connect(**db_config)
+        ensure_export_batch_table(conn)
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT images_json FROM export_batches WHERE token=%s", (token,))
+            row = cursor.fetchone()
+        if not row:
+            return jsonify({'status':'error','message':'批次不存在或已過期'}), 404
+        return jsonify({'status':'success','images':json.loads(row['images_json'])})
+    except Exception as e:
+        return jsonify({'status':'error','message':str(e)}), 500
+    finally:
+        if conn: conn.close()
 
 @app.route('/save', methods=['POST'])
 def save_data():

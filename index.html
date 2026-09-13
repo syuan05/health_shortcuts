@@ -259,6 +259,19 @@ input[type="time"] {
 
 </div>
 <div class="toast" id="toast">儲存成功！</div>
+<div id="batch-export-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:10001; align-items:center; justify-content:center; padding:20px;">
+  <div style="width:100%; max-width:400px; background:#fff; border-radius:14px; padding:18px;">
+    <div style="font-weight:700; font-size:17px; margin-bottom:14px;">📸 批次匯出到 iPhone 照片</div>
+    <label class="lbl">開始日期</label><input type="date" id="batch-start" style="margin-bottom:10px">
+    <label class="lbl">結束日期</label><input type="date" id="batch-end" style="margin-bottom:14px">
+    <div id="batch-progress" style="font-size:12px; color:#6b6560; min-height:20px; margin-bottom:10px;"></div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn-sec" onclick="closeBatchExport()">取消</button>
+      <button id="batch-go" class="btn-sec" style="background:var(--accent);color:white;border-color:var(--accent)" onclick="batchExportToPhotos()">產生並存入照片</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 const mealTypes=['早餐','午餐','晚餐','點心','宵夜']; 
@@ -828,30 +841,6 @@ async function saveRecord() {
     }
 }
 
-
-function openBatchExport() {
-    const d = document.getElementById('r-date').value || new Date().toISOString().split('T')[0];
-    document.getElementById('batch-start').value = d;
-    document.getElementById('batch-end').value = d;
-    document.getElementById('batch-export-modal').style.display = 'flex';
-}
-function closeBatchExport() {
-    document.getElementById('batch-export-modal').style.display = 'none';
-}
-function runBatchExportShortcut() {
-    const start = document.getElementById('batch-start').value;
-    const end = document.getElementById('batch-end').value;
-    if (!start || !end) return alert('請選擇開始與結束日期');
-    if (start > end) return alert('開始日期不能晚於結束日期');
-    const payload = JSON.stringify({
-        start, end,
-        api: `${BASE_URL}/get_records?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
-    });
-    closeBatchExport();
-    showToast('正在喚醒批次匯出捷徑…');
-    window.location.href = `shortcuts://run-shortcut?name=${encodeURIComponent('健康報表批次匯出')}&input=${encodeURIComponent(payload)}`;
-}
-
 function exportData() {
     const date = document.getElementById('r-date').value;
     if (!date) { alert("請選擇日期"); return; }
@@ -1032,6 +1021,75 @@ function exportData() {
         document.body.removeChild(element);
         showToast('匯出成功！');
     });
+}
+
+
+function openBatchExport(){
+    const d=document.getElementById('r-date').value || new Date().toISOString().split('T')[0];
+    document.getElementById('batch-start').value=d;
+    document.getElementById('batch-end').value=d;
+    document.getElementById('batch-progress').textContent='';
+    document.getElementById('batch-export-modal').style.display='flex';
+}
+function closeBatchExport(){ document.getElementById('batch-export-modal').style.display='none'; }
+function dateRange(start,end){
+    const out=[]; let d=new Date(start+'T00:00:00'), e=new Date(end+'T00:00:00');
+    while(d<=e){ out.push(d.toISOString().split('T')[0]); d.setDate(d.getDate()+1); }
+    return out;
+}
+function esc(v){ return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function sleepDurationText(start,end){
+    if(!start||!end) return '0 小時 0 分鐘';
+    let [sh,sm]=start.split(':').map(Number), [eh,em]=end.split(':').map(Number);
+    let a=sh*60+sm,b=eh*60+em; if(b<=a)b+=1440; const x=b-a;
+    return `${Math.floor(x/60)} 小時 ${x%60} 分鐘`;
+}
+function makeBatchReportElement(r){
+    const el=document.createElement('div');
+    el.style.cssText='width:375px;background:#f7f5f2;padding:15px;font-family:Arial,sans-serif;position:absolute;top:0;left:-9999px;';
+    const meals=r.meals||[];
+    let tc=0,tp=0,tv=0;
+    meals.forEach(m=>{tc+=parseFloat(m.carb)||0;tp+=parseFloat(m.prot)||0;tv+=parseFloat(m.veg)||0;});
+    let mealsHtml=meals.map(m=>`<div style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px;border:1px solid #e2ddd6"><div style="display:flex;justify-content:space-between;margin-bottom:8px;align-items:center"><span style="font-weight:bold;color:#c4773a;font-size:16px">🍴 ${esc(m.type)}</span><div style="font-size:12px"><span style="color:#c4773a;font-weight:bold;margin-left:4px">主食 ${esc(m.carb||0)}</span><span style="color:#3a7c5e;font-weight:bold;margin-left:4px">蛋白 ${esc(m.prot||0)}</span><span style="color:#4a90e2;font-weight:bold;margin-left:4px">蔬菜 ${esc(m.veg||0)}</span></div></div>${m.img?`<img crossorigin="anonymous" src="${esc(m.img)}" style="width:100%;border-radius:6px;margin-bottom:8px;display:block">`:''}${m.note?`<div style="font-size:12px;color:#6b6560;background:#f9f9f9;padding:6px;border-radius:4px">${esc(m.note)}</div>`:''}</div>`).join('');
+    const evil=r.evil||'否';
+    let evilHtml='';
+    if(evil==='是') evilHtml=`<div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #c44040;padding-left:8px;margin-top:15px">😈 邪惡食物放縱清單</div><div style="background:#fff5f5;border-radius:10px;padding:12px;border:1px solid #fbd5d5;color:#c44040;font-size:13px;margin-bottom:15px"><div> ${r.cheatDessert==='是'?'☑️':'⬜'} 🍩 甜點</div><div> ${r.cheatDrink==='是'?'☑️':'⬜'} 🧋 飲料</div><div> ${r.cheatFried==='是'?'☑️':'⬜'} 🍗 炸物</div></div>`;
+    let exerHtml='';
+    if(r.isExercise==='是') exerHtml=`<div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #3a7c5e;padding-left:8px;margin-top:15px">💪 運動紀錄</div><div style="background:#eaf2ee;border-radius:10px;padding:12px;border:1px solid #d1e2d9;color:#3a7c5e;margin-bottom:15px">${(r.exerList||[]).map(x=>`<div style="font-size:13px;margin-bottom:4px">🏃 <b>${esc(x.name)}</b>: ${esc(x.str)}</div>`).join('')||'有運動（未填寫項目）'}</div>`;
+    const water=parseFloat(r.water)||0, steps=parseFloat(r.steps)||0;
+    el.innerHTML=`<div style="padding:5px"><div style="text-align:center;margin-bottom:15px"><h2 style="color:#c4773a;margin:0;font-size:20px">健康自檢報表</h2><div style="margin-top:4px;color:#6b6560;font-size:13px">${esc(r.date)}</div></div><div style="background:#fffcf5;border:1px solid #f0e6d2;border-radius:12px;padding:12px;margin-bottom:15px;display:flex;justify-content:space-around;text-align:center"><div><small>總主食${tc<2.5?'⚠️':''}</small><br><b>${tc.toFixed(1)}</b><br><small>(2.5)</small></div><div><small>總蛋白${tp<3?'⚠️':''}</small><br><b>${tp.toFixed(1)}</b><br><small>(3)</small></div><div><small>總蔬菜${tv<3.5?'⚠️':''}</small><br><b>${tv.toFixed(1)}</b><br><small>(3.5)</small></div></div><div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #c4773a;padding-left:8px">🥗 飲食紀錄</div>${mealsHtml}<div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #6b6560;padding-left:8px;margin-top:15px">🧠 身體與睡眠</div><div style="background:#f0ede8;padding:12px;border-radius:10px;font-size:12px;margin-bottom:15px"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"><div>壓力: <b>${esc(r.stress||0)}</b></div><div>疲勞: <b>${esc(r.fatigue||0)}</b></div><div>便便: <b>${esc(r.poop||0)}</b></div><div>水腫: <b>${esc(r.edema||0)}</b></div><div>飽足: <b>${esc(r.fullness||0)}</b></div><div>邪惡: <b>${esc(evil)}</b></div></div><div style="border-top:1px solid #dcd9d4;padding-top:10px">睡眠: <b>${esc(r.sleepScore||0)}</b>　${esc(r.sleepStart||'--:--')} ~ ${esc(r.sleepEnd||'--:--')}　<span style="color:#c4773a">(${sleepDurationText(r.sleepStart,r.sleepEnd)})</span></div></div>${evilHtml}<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px"><div style="background:#f0f7ff;padding:8px;border-radius:10px;border:1px solid #d0e3f7"><div style="color:#4a90e2;font-size:11px;font-weight:bold">💧 水量 ${water}ml</div><div style="background:#e2ddd6;height:6px;border-radius:3px;margin-top:5px"><div style="width:${Math.min(water/2415*100,100)}%;background:#4a90e2;height:100%;border-radius:3px"></div></div></div><div style="background:#fff9f0;padding:8px;border-radius:10px;border:1px solid #f7e9d7"><div style="color:#c4773a;font-size:11px;font-weight:bold">🔥 步數 ${steps}</div><div style="background:#e2ddd6;height:6px;border-radius:3px;margin-top:5px"><div style="width:${Math.min(steps/6000*100,100)}%;background:#c4773a;height:100%;border-radius:3px"></div></div></div></div>${exerHtml}</div>`;
+    document.body.appendChild(el); return el;
+}
+async function waitImages(el){
+    const imgs=[...el.querySelectorAll('img')];
+    await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=res;img.onerror=res;})));
+}
+async function batchExportToPhotos(){
+    const start=document.getElementById('batch-start').value,end=document.getElementById('batch-end').value;
+    if(!start||!end||start>end) return alert('請確認日期區間');
+    const dates=dateRange(start,end); if(dates.length>31) return alert('一次最多匯出 31 天');
+    const btn=document.getElementById('batch-go'), prog=document.getElementById('batch-progress'); btn.disabled=true;
+    try{
+        const imageUrls=[];
+        for(let i=0;i<dates.length;i++){
+            prog.textContent=`正在處理 ${dates[i]}（${i+1}/${dates.length}）...`;
+            const gr=await fetch(`${BASE_URL}/get_record?date=${dates[i]}&t=${Date.now()}`); const gj=await gr.json();
+            if(gj.status!=='success') continue;
+            const el=makeBatchReportElement(gj.data); await waitImages(el);
+            const canvas=await html2canvas(el,{scale:2,backgroundColor:'#f7f5f2',useCORS:true,allowTaint:false});
+            el.remove();
+            const up=await fetch(`${BASE_URL}/upload`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:canvas.toDataURL('image/jpeg',0.9)})});
+            const uj=await up.json(); if(uj.status==='success') imageUrls.push({date:dates[i],url:uj.url});
+        }
+        if(!imageUrls.length) throw new Error('此區間沒有可匯出的紀錄');
+        prog.textContent='正在建立批次清單...';
+        const cr=await fetch(`${BASE_URL}/create_export_batch`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:imageUrls})});
+        const cj=await cr.json(); if(cj.status!=='success') throw new Error(cj.message||'建立批次失敗');
+        prog.textContent=`已產生 ${imageUrls.length} 張，正在開啟捷徑...`;
+        const shortcutName='健康報表批次匯出';
+        window.location.href=`shortcuts://run-shortcut?name=${encodeURIComponent(shortcutName)}&input=${encodeURIComponent(cj.manifest_url)}`;
+    }catch(e){ console.error(e); alert('批次匯出失敗：'+e.message); }
+    finally{btn.disabled=false;}
 }
 
 async function checkSystemStatus() {
@@ -1215,20 +1273,6 @@ window.onload = async () => {
 
 
 </script>
-
-<div id="batch-export-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:10001; align-items:center; justify-content:center; padding:20px;">
-  <div style="width:100%; max-width:380px; background:#fff; border-radius:14px; padding:18px;">
-    <div style="font-weight:700; margin-bottom:14px;">📸 批次匯出到 iPhone 照片</div>
-    <label class="lbl">開始日期</label><input type="date" id="batch-start" style="margin-bottom:10px;">
-    <label class="lbl">結束日期</label><input type="date" id="batch-end" style="margin-bottom:14px;">
-    <div style="font-size:12px;color:#6b6560;margin-bottom:14px;">按下後會喚醒 iOS 捷徑「健康報表批次匯出」。捷徑會一次取得區間資料並把 JPG 全部存入照片 App。</div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="closeBatchExport()" style="flex:1;padding:12px;border:0;border-radius:8px;background:#eee;">取消</button>
-      <button onclick="runBatchExportShortcut()" style="flex:1;padding:12px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;">存入照片</button>
-    </div>
-  </div>
-</div>
-
 <div id="crop-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; flex-direction:column; align-items:center; justify-content:center;">
     <div style="width:90%; max-width:400px; background:#fff; border-radius:14px; overflow:hidden;">
         <div style="padding:15px; text-align:center; font-weight:bold; border-bottom:1px solid #eee;">裁切照片 (4:3)</div>
