@@ -1033,10 +1033,39 @@ function exportData() {
 }
 
 
+function onBatchStartChange(){
+    const start=document.getElementById('batch-start');
+    const end=document.getElementById('batch-end');
+
+    // 結束日期不可早於開始日期
+    end.min=start.value;
+
+    // 若原本結束日期早於開始日期，先同步成開始日期
+    if(!end.value || end.value < start.value){
+        end.value=start.value;
+    }
+
+    // 選完開始日期後，直接開啟結束日期選擇器
+    requestAnimationFrame(()=>{
+        try{
+            if(typeof end.showPicker === 'function'){
+                end.showPicker();
+            }else{
+                end.focus();
+                end.click();
+            }
+        }catch(e){
+            end.focus();
+            try{ end.click(); }catch(_){}
+        }
+    });
+}
+
 function openBatchExport(){
     const d=document.getElementById('r-date').value || new Date().toISOString().split('T')[0];
     document.getElementById('batch-start').value=d;
     document.getElementById('batch-end').value=d;
+    document.getElementById('batch-end').min=d;
     document.getElementById('batch-progress').textContent='';
     document.getElementById('batch-export-modal').style.display='flex';
 }
@@ -1360,9 +1389,11 @@ window.onload = async () => {
         }
     });
 
+    // 5. 🔥【最終保險】萬一被 iOS 嚴格阻擋，使用者回到 App 隨便點擊螢幕任何地方，立刻再次補抓！
     document.addEventListener('click', function autoParamSyncOnClick() {
         const success = syncFromURLParams();
         if (success) {
+            // 成功填入後就拆掉監聽器，避免影響後續正常點擊
             document.removeEventListener('click', autoParamSyncOnClick);
         }
     });
