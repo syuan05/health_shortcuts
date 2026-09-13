@@ -198,7 +198,7 @@ input[type="time"] {
         </div>
         <div style="display:flex; flex-direction:column; gap:10px;">
             <label style="display:flex; justify-content:space-between; align-items:center; font-size:14px; cursor:pointer;">
-                <span><input type="checkbox" id="chk-dessert" onchange="calcAll()" style="width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🍩 甜點</span>
+                <span><input type="checkbox" id="chk-dessert" onchange="calcAll()" style="width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🍩 甜點/精緻澱粉</span>
                 <span id="quota-dessert-txt" style="font-size:12px; color:var(--text2);">剩餘 -- 次</span>
             </label>
             <label style="display:flex; justify-content:space-between; align-items:center; font-size:14px; cursor:pointer;">
@@ -206,7 +206,7 @@ input[type="time"] {
                 <span id="quota-drink-txt" style="font-size:12px; color:var(--text2);">剩餘 -- 次</span>
             </label>
             <label style="display:flex; justify-content:space-between; align-items:center; font-size:14px; cursor:pointer;">
-                <span><input type="checkbox" id="chk-fried" onchange="calcAll()" style="style; width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🍗 炸物</span>
+                <span><input type="checkbox" id="chk-fried" onchange="calcAll()" style="style; width:18px; height:18px; margin-right:6px; display:inline-block; vertical-align:middle;">🍗 炸物/高油鹽</span>
                 <span id="quota-fried-txt" style="font-size:12px; color:var(--text2);">剩餘 -- 次</span>
             </label>
         </div>
@@ -883,9 +883,9 @@ function exportData() {
         evilChecklistHtml = `
             <div style="margin-bottom:10px; font-weight:bold; color:#6b6560; font-size:14px; border-left:3px solid #c44040; padding-left:8px; margin-top:15px;">😈 邪惡食物放縱清單</div>
             <div style="background:#fff5f5; border-radius:10px; padding:12px; border:1px solid #fbd5d5; color:#c44040; font-size:13px; margin-bottom:15px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${dIcon} 🍩 甜點</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${dRem}</span></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${dIcon} 🍩 甜點/精緻澱粉</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${dRem}</span></div>
                 <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${drIcon} 🧋 飲料</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${drRem}</span></div>
-                <div style="display:flex; justify-content:space-between;"><span>${fIcon} 🍗 炸物</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${fRem}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>${fIcon} 🍗 炸物/高油鹽</span> <span style="color:#6b6560; font-size:12px; font-weight:bold;">${fRem}</span></div>
             </div>
         `;
     }
@@ -1070,7 +1070,7 @@ function makeBatchReportElement(r){
     let mealsHtml=meals.map(m=>`<div style="background:#fff;border-radius:10px;padding:12px;margin-bottom:12px;border:1px solid #e2ddd6"><div style="display:flex;justify-content:space-between;margin-bottom:8px;align-items:center"><span style="font-weight:bold;color:#c4773a;font-size:16px">🍴 ${esc(m.type)}</span><div style="font-size:12px"><span style="color:#c4773a;font-weight:bold;margin-left:4px">主食 ${esc(m.carb||0)}</span><span style="color:#3a7c5e;font-weight:bold;margin-left:4px">蛋白 ${esc(m.prot||0)}</span><span style="color:#4a90e2;font-weight:bold;margin-left:4px">蔬菜 ${esc(m.veg||0)}</span></div></div>${m.img?`<img crossorigin="anonymous" src="${esc(m.img)}" style="width:100%;border-radius:6px;margin-bottom:8px;display:block">`:''}${m.note?`<div style="font-size:12px;color:#6b6560;background:#f9f9f9;padding:6px;border-radius:4px">${esc(m.note)}</div>`:''}</div>`).join('');
     const evil=r.evil||'否';
     let evilHtml='';
-    if(evil==='是') evilHtml=`<div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #c44040;padding-left:8px;margin-top:15px">😈 邪惡食物放縱清單</div><div style="background:#fff5f5;border-radius:10px;padding:12px;border:1px solid #fbd5d5;color:#c44040;font-size:13px;margin-bottom:15px"><div> ${r.cheatDessert==='是'?'☑️':'⬜'} 🍩 甜點</div><div> ${r.cheatDrink==='是'?'☑️':'⬜'} 🧋 飲料</div><div> ${r.cheatFried==='是'?'☑️':'⬜'} 🍗 炸物</div></div>`;
+    if(evil==='是') evilHtml=`<div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #c44040;padding-left:8px;margin-top:15px">😈 邪惡食物放縱清單</div><div style="background:#fff5f5;border-radius:10px;padding:12px;border:1px solid #fbd5d5;color:#c44040;font-size:13px;margin-bottom:15px"><div> ${r.cheatDessert==='是'?'☑️':'⬜'} 🍩 甜點/精緻澱粉</div><div> ${r.cheatDrink==='是'?'☑️':'⬜'} 🧋 飲料</div><div> ${r.cheatFried==='是'?'☑️':'⬜'} 🍗 炸物/高油鹽</div></div>`;
     let exerHtml='';
     if(r.isExercise==='是') exerHtml=`<div style="margin-bottom:10px;font-weight:bold;color:#6b6560;font-size:14px;border-left:3px solid #3a7c5e;padding-left:8px;margin-top:15px">💪 運動紀錄</div><div style="background:#eaf2ee;border-radius:10px;padding:12px;border:1px solid #d1e2d9;color:#3a7c5e;margin-bottom:15px">${(r.exerList||[]).map(x=>`<div style="font-size:13px;margin-bottom:4px">🏃 <b>${esc(x.name)}</b>: ${esc(x.str)}</div>`).join('')||'有運動（未填寫項目）'}</div>`;
     const water=parseFloat(r.water)||0, steps=parseFloat(r.steps)||0;
