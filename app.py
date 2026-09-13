@@ -103,6 +103,41 @@ def get_record():
         if conn:
             conn.close()
 
+
+@app.route('/get_records', methods=['GET'])
+def get_records():
+    """依據開始/結束日期一次抓取區間紀錄，供 iOS 捷徑批次匯出使用。"""
+    start = request.args.get('start')
+    end = request.args.get('end')
+    if not start or not end:
+        return jsonify({"status": "error", "message": "Missing start/end"}), 400
+
+    conn = None
+    try:
+        conn = pymysql.connect(**db_config)
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT record_date, raw_json
+                FROM daily_records
+                WHERE record_date BETWEEN %s AND %s
+                ORDER BY record_date ASC
+            """
+            cursor.execute(sql, (start, end))
+            rows = cursor.fetchall()
+
+        data = []
+        for row in rows:
+            if row.get('raw_json'):
+                rec = json.loads(row['raw_json'])
+                rec['date'] = str(row['record_date'])
+                data.append(rec)
+        return jsonify({"status": "success", "data": data, "count": len(data)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
 @app.route('/delete', methods=['POST'])
 def delete_record():
     """ 依據日期刪除雲端紀錄 """
