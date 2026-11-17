@@ -1,6 +1,5 @@
 Flask
 flask-cors
-pymysql
+psycopg2-binary
 gunicorn
 cloudinary
-cryptography

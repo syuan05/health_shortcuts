@@ -1,27 +1,27 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import pymysql
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import json
 import cloudinary
 import cloudinary.uploader
 import os
 import uuid
-from datetime import datetime, timedelta
 
 app = Flask(__name__)
-# 允許跨域請求，讓你的網頁（前端）可以呼叫這個 API
 CORS(app)
 
 # --- 配置資訊 (從 Render 環境變數讀取) ---
-db_config = {
-    'host': os.environ.get('DB_HOST'),
-    'user': os.environ.get('DB_USER'),
-    'password': os.environ.get('DB_PASSWORD'),
-    'database': 'defaultdb',
-    'port': 19281,
-    'charset': 'utf8mb4',
-    'cursorclass': pymysql.cursors.DictCursor
-}
+def get_db_connection():
+    return psycopg2.connect(
+        host=os.environ.get('DB_HOST'),
+        user=os.environ.get('DB_USER'),
+        password=os.environ.get('DB_PASSWORD'),
+        dbname=os.environ.get('DB_NAME', 'neondb'), # 若用 Aiven 預設通常是 defaultdb
+        port=os.environ.get('DB_PORT', 5432),
+        sslmode='require', # 雲端 PostgreSQL (Neon / Aiven) 皆需 SSL
+        cursor_factory=RealDictCursor
+    )
 
 cloudinary.config(
     cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'),
@@ -33,28 +33,29 @@ cloudinary.config(
 # --- 1. 系統診斷路由 ---
 @app.route('/health', methods=['GET'])
 def health():
-    """ 專門給 Render 自動檢查用：純文字回應，絕不連線資料庫，阻止 Log 暴增 """
     return jsonify({"status": "ok", "message": "Flask is running"}), 200
 
 @app.route('/db_health', methods=['GET'])
 def db_health():
-    """ 專門給網頁前端（index.html）開啟時檢查 Aiven 資料庫狀態 """
+    conn = None
     try:
-        conn = pymysql.connect(**db_config)
+        conn = get_db_connection()
         with conn.cursor() as cursor:
-            cursor.execute("SELECT 1") # 極輕量查詢，只確認連線是否正常
-        conn.close()
+            cursor.execute("SELECT 1")
         return jsonify({"status": "success", "message": "Database connected"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    
+    finally:
+        if conn:
+            conn.close()
+
 @app.route('/test', methods=['GET'])
 def test_db():
     return jsonify({"status": "ok", "message": "Redirected test endpoint"}), 200
 
+# --- 2. 圖片上傳路由 ---
 @app.route('/upload', methods=['POST'])
 def upload_image():
-    """ 安全上傳：由後端代理將圖片傳至 Cloudinary """
     try:
         data = request.json
         image_data = data.get('image') 
@@ -62,7 +63,6 @@ def upload_image():
         if not image_data:
             return jsonify({"status": "error", "message": "無圖片數據"}), 400
 
-        # 上傳到 Cloudinary 並指定資料夾
         upload_result = cloudinary.uploader.upload(
             image_data,
             folder="health_app_photos",
@@ -71,7 +71,7 @@ def upload_image():
 
         return jsonify({
             "status": "success",
-            "url": upload_result.get("secure_url") # 回傳 https 網址
+            "url": upload_result.get("secure_url")
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -79,14 +79,13 @@ def upload_image():
 # --- 3. 數據讀取路由 ---
 @app.route('/get_record', methods=['GET'])
 def get_record():
-    """ 依據日期抓取雲端紀錄 """
     date = request.args.get('date')
     if not date:
         return jsonify({"status": "error", "message": "Missing date"}), 400
     
     conn = None
     try:
-        conn = pymysql.connect(**db_config)
+        conn = get_db_connection()
         with conn.cursor() as cursor:
             sql = "SELECT raw_json FROM daily_records WHERE record_date = %s"
             cursor.execute(sql, (date,))
@@ -105,9 +104,9 @@ def get_record():
         if conn:
             conn.close()
 
+# --- 4. 數據刪除路由 ---
 @app.route('/delete', methods=['POST'])
 def delete_record():
-    """ 依據日期刪除雲端紀錄 """
     data = request.json
     date = data.get('date')
     if not date:
@@ -115,9 +114,8 @@ def delete_record():
     
     conn = None
     try:
-        conn = pymysql.connect(**db_config)
+        conn = get_db_connection()
         with conn.cursor() as cursor:
-            # 執行刪除指令
             sql = "DELETE FROM daily_records WHERE record_date = %s"
             cursor.execute(sql, (date,))
         conn.commit()
@@ -128,15 +126,15 @@ def delete_record():
         if conn:
             conn.close()    
 
-
+# --- 5. 批次匯出路由 ---
 def ensure_export_batch_table(conn):
     with conn.cursor() as cursor:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS export_batches (
                 token VARCHAR(64) PRIMARY KEY,
-                images_json LONGTEXT NOT NULL,
+                images_json TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) CHARACTER SET utf8mb4
+            )
         """)
     conn.commit()
 
@@ -149,10 +147,10 @@ def create_export_batch():
     token = uuid.uuid4().hex
     conn = None
     try:
-        conn = pymysql.connect(**db_config)
+        conn = get_db_connection()
         ensure_export_batch_table(conn)
         with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM export_batches WHERE created_at < NOW() - INTERVAL 2 DAY")
+            cursor.execute("DELETE FROM export_batches WHERE created_at < NOW() - INTERVAL '2 days'")
             cursor.execute("INSERT INTO export_batches (token, images_json) VALUES (%s,%s)",
                            (token, json.dumps(images, ensure_ascii=False)))
         conn.commit()
@@ -161,13 +159,14 @@ def create_export_batch():
     except Exception as e:
         return jsonify({'status':'error','message':str(e)}), 500
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
 @app.route('/export_batch/<token>', methods=['GET'])
 def export_batch(token):
     conn = None
     try:
-        conn = pymysql.connect(**db_config)
+        conn = get_db_connection()
         ensure_export_batch_table(conn)
         with conn.cursor() as cursor:
             cursor.execute("SELECT images_json FROM export_batches WHERE token=%s", (token,))
@@ -178,16 +177,17 @@ def export_batch(token):
     except Exception as e:
         return jsonify({'status':'error','message':str(e)}), 500
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
+# --- 6. 儲存數據路由 ---
 @app.route('/save', methods=['POST'])
 def save_data():
-    """ 儲存數據：現在 JSON 內的 img 欄位存的是 URL 字串 """
     data = request.json
+    conn = None
     try:
-        conn = pymysql.connect(**db_config)
+        conn = get_db_connection()
         with conn.cursor() as cursor:
-            # Aiven 資料庫中 raw_json 建議使用 TEXT 或 LONGTEXT
             sql = """
             INSERT INTO daily_records (
                 record_date, water_intake, steps, exercise_status, 
@@ -195,9 +195,17 @@ def save_data():
                 edema_level, fullness_level, evil_food, raw_json
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE 
-                water_intake=VALUES(water_intake), steps=VALUES(steps),
-                raw_json=VALUES(raw_json)
+            ON CONFLICT (record_date) DO UPDATE SET 
+                water_intake = EXCLUDED.water_intake,
+                steps = EXCLUDED.steps,
+                exercise_status = EXCLUDED.exercise_status,
+                stress_level = EXCLUDED.stress_level,
+                fatigue_level = EXCLUDED.fatigue_level,
+                poop_level = EXCLUDED.poop_level,
+                edema_level = EXCLUDED.edema_level,
+                fullness_level = EXCLUDED.fullness_level,
+                evil_food = EXCLUDED.evil_food,
+                raw_json = EXCLUDED.raw_json
             """
             cursor.execute(sql, (
                 data.get('date'),
@@ -210,13 +218,15 @@ def save_data():
                 data.get('edema') or 0,
                 data.get('fullness') or 0,
                 data.get('evil', '否'),
-                json.dumps(data) # 這裡存入的是包含 Cloudinary 網址的 JSON
+                json.dumps(data, ensure_ascii=False)
             ))
         conn.commit()
-        conn.close()
         return jsonify({"status": "success", "message": "數據已備份至雲端！"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
